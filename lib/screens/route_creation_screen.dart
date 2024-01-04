@@ -47,27 +47,6 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
   List<String> displayTags = [];
   late TextfieldTagsController _textfieldTagsController;
 
-  // List<TextEditingController> _selectedStopControllers = [];
-
-  void _addStop() async {
-    osm.GeoPoint selectedLocation = osm.GeoPoint(
-      latitude: widget.currentLocationData!.latitude!,
-      longitude: widget.currentLocationData!.longitude!,
-    );
-    final selectedPoint = await showSimplePickerLocation(
-      context: context,
-      isDismissible: true,
-      title: "Select Stop",
-      textConfirmPicker: "pick",
-      zoomOption: const ZoomOption(
-        initZoom: 15,
-      ),
-      initPosition: selectedLocation,
-      radius: 15.0,
-    );
-    if (selectedPoint != null) {}
-  }
-
   @override
   void initState() {
     super.initState();
@@ -83,7 +62,6 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
     flutterMapController = flutterMap.MapController();
     stops.add(LatLng(widget.currentLocationData!.latitude!,
         widget.currentLocationData!.longitude!));
-    _fetchUserAddedStops();
   }
 
   @override
@@ -145,14 +123,25 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
     List<String> stops =
         _stopControllers.map((controller) => controller.text).toList();
     String? generatedRRule = generatedRRuleNotifier.value;
-    String? tags = _tagsController.text;
-    if (tags.isEmpty) {
+    String tag = '';
+    List<String> tagsList = _textfieldTagsController.getTags!;
+    if (tagsList.isNotEmpty) {
+      for (int i = 0; i < tagsList.length; i++) {
+        if (i == tagsList.length - 1) {
+          tag += tagsList[i];
+          break;
+        }
+        tag += '${tagsList[i]},';
+      }
+    }
+    RegExp tagRegExp = RegExp(r'^[a-zA-Z]+(?:,[a-zA-Z]+)*$');
+    if (tag.isEmpty || !tagRegExp.hasMatch(tag)) {
       showDialog(
           context: context,
           builder: (context) {
             return AlertDialog(
-              title: const Text('Missing Tags'),
-              content: const Text('Please enter at least one tag.'),
+              title: const Text('Invalid Tags'),
+              content: const Text('Please enter a valid tag.'),
               actions: [
                 TextButton(
                   onPressed: () {
@@ -163,28 +152,6 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
               ],
             );
           });
-    }
-    RegExp tagRegExp = RegExp(r'^[a-zA-Z]+(?:,[a-zA-Z]+)*$');
-    if (!tagRegExp.hasMatch(tags)) {
-      showDialog(
-        context: context,
-        builder: (context) {
-          return AlertDialog(
-            title: const Text('Invalid Tags'),
-            content:
-                const Text('Tags must consist of letters separated by commas.'),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
-                child: const Text('Ok'),
-              ),
-            ],
-          );
-        },
-      );
-      return; // Exit function if tags are invalid
     }
 
     if (routeName.isNotEmpty && stops.length >= 2) {
@@ -212,7 +179,7 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
                 'stops': stops,
                 'rrule': generatedRRule,
                 'dates': dates.map((date) => date.toIso8601String()).toList(),
-                'tags': tags,
+                'tags': tag,
               }
             ]),
           });
@@ -417,15 +384,17 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
                 itemCount: _stopNameControllers.length,
                 itemBuilder: (context, index) {
                   return Padding(
-                    key: ValueKey(index),
+                    key: ValueKey(stops[index]),
                     padding: const EdgeInsets.fromLTRB(0, 0, 0, 10),
                     child: Row(
                       children: <Widget>[
+                        const Icon(Icons.reorder),
                         SizedBox(
                           height: 60,
-                          width: MediaQuery.of(context).size.width * 0.8,
+                          width: MediaQuery.of(context).size.width * 0.75,
                           child: TextField(
                             readOnly: true,
+                            // enabled: false,
                             controller: _stopNameControllers[index],
                             decoration: InputDecoration(
                                 labelText: 'Stop ${index + 1}',
@@ -479,11 +448,9 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
                   {
                     newIndex--;
                   }
-
                   TextEditingController stopNameController = _stopNameControllers.removeAt(oldIndex);
                   TextEditingController stopController = _stopControllers.removeAt(oldIndex);
                   LatLng stop = stops.removeAt(oldIndex);
-
                   _stopNameControllers.insert(newIndex, stopNameController);
                   _stopControllers.insert(newIndex, stopController);
                   stops.insert(newIndex, stop);
@@ -493,6 +460,7 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
             ),
             ElevatedButton(
               onPressed: () async {
+                await _fetchUserAddedStops();
                 osm.GeoPoint selectedPoint = await Navigator.push(
                   context,
                   MaterialPageRoute(
