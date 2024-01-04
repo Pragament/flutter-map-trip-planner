@@ -3,8 +3,9 @@
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:driver_app/all_routes.dart';
-import 'package:driver_app/search_example.dart';
+import 'package:driver_app/screens/all_routes.dart';
+import 'package:driver_app/miscellaenous/search_example.dart';
+import 'package:driver_app/widgets/tags_auto_completion.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_osm_plugin/flutter_osm_plugin.dart';
@@ -107,140 +108,7 @@ class _AddStopScreenState extends State<AddStopScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            Autocomplete<String>(
-              optionsViewBuilder: (context, onSelected, options) {
-                return Container(
-                  margin: const EdgeInsets.only(right: 30),
-                  child: Align(
-                    alignment: Alignment.topCenter,
-                    child: Material(
-                      elevation: 4.0,
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxHeight: 200),
-                        child: ListView.builder(
-                          shrinkWrap: true,
-                          itemCount: options.length,
-                          itemBuilder: (BuildContext context, int index) {
-                            final dynamic option = options.elementAt(index);
-                            return TextButton(
-                              onPressed: () {
-                                onSelected(option);
-                              },
-                              child: Align(
-                                alignment: Alignment.centerLeft,
-                                child: Text(
-                                  '#$option',
-                                  textAlign: TextAlign.left,
-                                  style: const TextStyle(
-                                    color: Color.fromARGB(255, 74, 137, 92),
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
-              optionsBuilder: (TextEditingValue textEditingValue) {
-                if (textEditingValue.text == '') {
-                  return const Iterable<String>.empty();
-                }
-                return widget.allTags!.where((String option) {
-                  return option.contains(textEditingValue.text.toLowerCase());
-                });
-              },
-              onSelected: (String selectedTag) {
-                _textfieldTagsController.addTag = selectedTag;
-              },
-              fieldViewBuilder: (context, ttec, tfn, onFieldSubmitted) {
-                return TextFieldTags(
-                  textEditingController: ttec,
-                  focusNode: tfn,
-                  textfieldTagsController: _textfieldTagsController,
-                  initialTags: displayTags,
-                  textSeparators: const [' ',','],
-                  letterCase: LetterCase.normal,
-                  validator: (String tag) {
-                    if (_textfieldTagsController.getTags!.contains(tag)) {
-                      return 'you already entered that';
-                    }
-                    return null;
-                  },
-                  inputfieldBuilder:
-                      (context, tec, fn, error, onChanged, onSubmitted) {
-                    return ((context, sc, tags, onTagDelete) {
-                      return TextField(
-                        controller: tec,
-                        focusNode: fn,
-                        decoration: InputDecoration(
-                          border: const OutlineInputBorder(),
-                          helperStyle: const TextStyle(
-                            color: Color.fromARGB(255, 74, 137, 92),
-                          ),
-                          labelText: 'tags',
-                          hintText: 'Seperate each tag using (,)',
-                          errorText: error,
-                          prefixIcon: tags.isNotEmpty
-                              ? SingleChildScrollView(
-                                  controller: sc,
-                                  scrollDirection: Axis.horizontal,
-                                  child: Row(
-                                      children: tags.map((String tag) {
-                                    return Container(
-                                      decoration: const BoxDecoration(
-                                        borderRadius: BorderRadius.all(
-                                          Radius.circular(20.0),
-                                        ),
-                                        color: Color.fromARGB(255, 74, 137, 92),
-                                      ),
-                                      margin:
-                                          const EdgeInsets.only(right: 10.0),
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 10.0, vertical: 4.0),
-                                      child: Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          InkWell(
-                                            child: Text(
-                                              '#$tag',
-                                              style: const TextStyle(
-                                                  color: Colors.white),
-                                            ),
-                                            onTap: () {
-                                              //print("$tag selected");
-                                            },
-                                          ),
-                                          const SizedBox(width: 4.0),
-                                          InkWell(
-                                            child: const Icon(
-                                              Icons.cancel,
-                                              size: 14.0,
-                                              color: Color.fromARGB(
-                                                  255, 233, 233, 233),
-                                            ),
-                                            onTap: () {
-                                              onTagDelete(tag);
-                                            },
-                                          )
-                                        ],
-                                      ),
-                                    );
-                                  }).toList()),
-                                )
-                              : null,
-                        ),
-                        onChanged: onChanged,
-                        onSubmitted: onSubmitted,
-                      );
-                    });
-                  },
-                );
-              },
-            ),
+            TagsAutoCompletion(textfieldTagsController: _textfieldTagsController, allTags: widget.allTags, displayTags: displayTags),
             const SizedBox(height: 20),
             TextField(
               controller: _titleController,

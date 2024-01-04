@@ -3,12 +3,12 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:driver_app/add_stop.dart';
+import 'package:driver_app/screens/add_stop.dart';
 import 'package:driver_app/screens/login.dart';
 import 'package:driver_app/screens/route_creation_screen.dart';
 import 'package:driver_app/screens/route_edit_screen.dart';
-import 'package:driver_app/route_copy_screen.dart';
-import 'package:driver_app/route_table.dart';
+import 'package:driver_app/screens/route_copy_screen.dart';
+import 'package:driver_app/widgets/route_table.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -1058,8 +1058,10 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
                 context,
                 MaterialPageRoute(
                   builder: (context) => RouteCreationScreen(
+                    selectedTag: selectedTag,
                     locationName: locationName,
                     currentLocationData: currentLocation,
+                    allTags: allTagsList,
                   ),
                 ),
               );

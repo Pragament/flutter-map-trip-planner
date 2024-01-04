@@ -9,10 +9,10 @@ import 'package:permission_handler/permission_handler.dart';
 
 import 'firebase_options.dart';
 import 'screens/login.dart';
-import 'local_notifications.dart';
-import 'route_table.dart';
-import 'all_routes.dart';
-import 'route_display_screen.dart';
+import 'widgets/local_notifications.dart';
+import 'widgets/route_table.dart';
+import 'screens/all_routes.dart';
+import 'screens/route_display_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
