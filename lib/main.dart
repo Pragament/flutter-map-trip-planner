@@ -1,13 +1,16 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+
+import 'firebase_options.dart';
+import 'package:driver_app/providers/loading_provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:permission_handler/permission_handler.dart';
 
-import 'firebase_options.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'screens/login.dart';
 import 'widgets/local_notifications.dart';
 import 'widgets/route_table.dart';
@@ -136,21 +139,28 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Driver App',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(
+          create: (ctx) => LoadingProvider(),
+        ),
+      ],
+      child: MaterialApp(
+        title: 'Driver App',
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+          useMaterial3: true,
+        ),
+        home: widget.isSignedInWithin5Days
+            ? const AllRoutesMapScreen()
+            : PhoneAuthScreen(),
+        debugShowCheckedModeBanner: false,
+        routes: {
+          '/routetable': (context) => RouteTable(routes: widget.routes),
+          '/login': (context) => PhoneAuthScreen(),
+          '/allroutes': (context) => AllRoutesMapScreen(),
+        },
       ),
-      home: widget.isSignedInWithin5Days
-          ? AllRoutesMapScreen()
-          : PhoneAuthScreen(),
-      debugShowCheckedModeBanner: false,
-      routes: {
-        '/routetable': (context) => RouteTable(routes: widget.routes),
-        '/login': (context) => PhoneAuthScreen(),
-        '/allroutes': (context) => AllRoutesMapScreen(),
-      },
     );
   }
 }

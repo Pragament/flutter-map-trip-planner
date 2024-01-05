@@ -37,7 +37,6 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
   final TextEditingController _routeNameController = TextEditingController();
   final List<TextEditingController> _stopControllers = [];
   final List<TextEditingController> _stopNameControllers = [];
-  late TextEditingController _tagsController = TextEditingController();
   final TextEditingController _stopnameController = TextEditingController();
   List<Map<String, dynamic>> displayedUserAddedStops = [];
   List<Map<String, dynamic>> copy = [];
@@ -114,6 +113,7 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
       }).toList();
     }
     setState(() {
+      displayedUserAddedStops.removeWhere((element) => (element['selectedPoint'].isEmpty||element['selectedPoint'] == null));
       displayedUserAddedStops = displayedUserAddedStops;
     });
   }
@@ -135,8 +135,8 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
       }
     }
     RegExp tagRegExp = RegExp(r'^[a-zA-Z]+(?:,[a-zA-Z]+)*$');
-    if (tag.isEmpty || !tagRegExp.hasMatch(tag)) {
-      showDialog(
+    if (tag.trim().isEmpty && !tagRegExp.hasMatch(tag.trim())) {
+      return showDialog(
           context: context,
           builder: (context) {
             return AlertDialog(
@@ -154,7 +154,7 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
           });
     }
 
-    if (routeName.isNotEmpty && stops.length >= 2) {
+    if (routeName.trim().isNotEmpty && stops.length >= 2) {
       try {
         User? user = FirebaseAuth.instance.currentUser;
 
@@ -384,7 +384,7 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
                 itemCount: _stopNameControllers.length,
                 itemBuilder: (context, index) {
                   return Padding(
-                    key: ValueKey(stops[index]),
+                    key: ValueKey(index),
                     padding: const EdgeInsets.fromLTRB(0, 0, 0, 10),
                     child: Row(
                       children: <Widget>[
@@ -461,7 +461,11 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
             ElevatedButton(
               onPressed: () async {
                 await _fetchUserAddedStops();
-                osm.GeoPoint selectedPoint = await Navigator.push(
+                osm.GeoPoint selectedPoint = osm.GeoPoint(
+                  latitude: widget.currentLocationData!.latitude!,
+                  longitude: widget.currentLocationData!.longitude!,
+                );
+                selectedPoint = await Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (ctx) => RouteAddStopScreen(
@@ -471,7 +475,7 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
                   ),
                 );
                 String? updatedStopName = await getPlaceName(
-                    selectedPoint.latitude, selectedPoint.longitude);
+                      selectedPoint.latitude, selectedPoint.longitude,);
                 String updatedStop = selectedPoint.toString();
                 setState(() {
                   _stopNameControllers
@@ -545,27 +549,27 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
                 ],
               ),
             ),
-            ValueListenableBuilder<String?>(
-              valueListenable: generatedRRuleNotifier,
-              builder: (context, savedRRule, child) {
-                return savedRRule != null
-                    ? Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              width: 1,
-                              color: Colors.black,
-                            )),
-                        child: Text(
-                          'Generated rrule: $savedRRule',
-                          style: const TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.bold),
-                        ),
-                      )
-                    : const SizedBox.shrink();
-              },
-            ),
+            // ValueListenableBuilder<String?>(
+            //   valueListenable: generatedRRuleNotifier,
+            //   builder: (context, savedRRule, child) {
+            //     return savedRRule != null
+            //         ? Container(
+            //             padding: const EdgeInsets.all(10),
+            //             decoration: BoxDecoration(
+            //                 borderRadius: BorderRadius.circular(10),
+            //                 border: Border.all(
+            //                   width: 1,
+            //                   color: Colors.black,
+            //                 )),
+            //             child: Text(
+            //               'Generated rrule: $savedRRule',
+            //               style: const TextStyle(
+            //                   fontSize: 16, fontWeight: FontWeight.bold),
+            //             ),
+            //           )
+            //         : const SizedBox.shrink();
+            //   },
+            // ),
           ],
         ),
       ),
