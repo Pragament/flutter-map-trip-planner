@@ -5,12 +5,17 @@ import 'package:driver_app/search_example.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_osm_plugin/flutter_osm_plugin.dart';
+import 'package:flutter_osm_interface/flutter_osm_interface.dart' as osm;
+import 'package:location/location.dart';
 import 'package:rrule_generator/rrule_generator.dart';
 
 class RouteEditScreen extends StatefulWidget {
-  final String routeName;
 
-  const RouteEditScreen({required this.routeName});
+  const RouteEditScreen({super.key, required this.currentLocationData, required this.routeName});
+
+  final String routeName;
+  final LocationData? currentLocationData;
 
   @override
   _RouteEditScreenState createState() => _RouteEditScreenState();
@@ -257,10 +262,21 @@ class _RouteEditScreenState extends State<RouteEditScreen> {
   }
 
   void _addStop() async {
-    final selectedPoint = await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: ((context) => const LocationAppExample()),
+
+    osm.GeoPoint selectedLocation = osm.GeoPoint(
+      latitude: widget.currentLocationData!.latitude!,
+      longitude: widget.currentLocationData!.longitude!,
+    );
+    final selectedPoint = await showSimplePickerLocation(
+      context: context,
+      isDismissible: true,
+      title: "Select Stop",
+      textConfirmPicker: "pick",
+      zoomOption: const ZoomOption(
+        initZoom: 15,
       ),
+      initPosition: selectedLocation,
+      radius: 15.0,
     );
     if (selectedPoint != null) {
       String updatedStop = selectedPoint.toString();

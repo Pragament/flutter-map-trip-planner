@@ -4,13 +4,14 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:driver_app/add_stop.dart';
-import 'package:driver_app/login.dart';
-import 'package:driver_app/route_creation_screen.dart';
-import 'package:driver_app/route_edit_screen.dart';
+import 'package:driver_app/screens/login.dart';
+import 'package:driver_app/screens/route_creation_screen.dart';
+import 'package:driver_app/screens/route_edit_screen.dart';
 import 'package:driver_app/route_copy_screen.dart';
 import 'package:driver_app/route_table.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -21,6 +22,21 @@ import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:firebase_storage/firebase_storage.dart' as firebase_storage;
+
+Future<String?> getPlaceName(double latitude, double longitude) async {
+  final response = await http.get(
+    Uri.parse(
+      'https://nominatim.openstreetmap.org/reverse?format=json&lat=$latitude&lon=$longitude',
+    ),
+  );
+
+  if (response.statusCode == 200) {
+    Map<String, dynamic> data = json.decode(response.body);
+    return data['display_name'];
+  } else {
+    throw Exception('Failed to load place name');
+  }
+}
 
 class AllRoutesMapScreen extends StatefulWidget {
   @override
@@ -45,16 +61,39 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
   String userName = '';
   String dateofbirth = '';
   String phoneNumber = '';
+  List<String> allTagsList = ['All'];
+  int previousIndex = 0;
+  List<bool> isSelected = [];
+  Future<List<String>>? futureList;
 
   @override
   void initState() {
     super.initState();
     flutterMapController = MapController();
     _fetchCurrentLocation();
+    isSelected.add(true);
+    futureList = _fetchAllStops();
   }
 
   Future<void> _fetchCurrentLocation() async {
     Location location = Location();
+
+    bool servicesEnabled = await location.serviceEnabled();
+    if (!servicesEnabled) {
+      servicesEnabled = await location.requestService();
+      if (!servicesEnabled) {
+        return;
+      }
+    }
+
+    PermissionStatus permissionStatus = await location.hasPermission();
+    if (permissionStatus != PermissionStatus.granted) {
+      permissionStatus = await location.requestPermission();
+      if (permissionStatus != PermissionStatus.granted) {
+        return;
+      }
+    }
+
     try {
       LocationData userLocation = await location.getLocation();
       setState(() {
@@ -80,22 +119,7 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
     }).toList();
   }
 
-  Future<String?> getPlaceName(double latitude, double longitude) async {
-    final response = await http.get(
-      Uri.parse(
-        'https://nominatim.openstreetmap.org/reverse?format=json&lat=$latitude&lon=$longitude',
-      ),
-    );
-
-    if (response.statusCode == 200) {
-      Map<String, dynamic> data = json.decode(response.body);
-      return data['display_name'];
-    } else {
-      throw Exception('Failed to load place name');
-    }
-  }
-
-  Future<void> _fetchAllStops() async {
+  Future<List<String>> _fetchAllStops() async {
     User? user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       DocumentSnapshot<Map<String, dynamic>> userDoc = await FirebaseFirestore
@@ -133,7 +157,27 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
           'point': LatLng(latitude, longitude),
         };
       }).toList();
+
+      // Get all tags from routes and user-added stops
+      Set<String> allTags = Set<String>();
+      allTags.add('All');
+      for (var route in userRoutes1) {
+        List<String> tags = route['tags'].split(',');
+        allTags.addAll(tags);
+      }
+
+      for (var stop in userAddedStops) {
+        allTags.addAll(stop['tags'].split(','));
+      }
+
+      allTagsList = allTags.toList();
+
+      for (int i = 1; i < allTagsList.length; i++) {
+        isSelected.add(false);
+      }
     }
+
+    return allTagsList;
   }
 
   Color _getRouteColor(int index) {
@@ -153,20 +197,6 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
     String? result = await showDialog<String>(
       context: context,
       builder: (BuildContext context) {
-        // Get all tags from routes and user-added stops
-        Set<String> allTags = Set<String>();
-
-        for (var route in userRoutes1) {
-          List<String> tags = route['tags'].split(',');
-          allTags.addAll(tags);
-        }
-
-        for (var stop in userAddedStops) {
-          allTags.addAll(stop['tags'].split(','));
-        }
-
-        List<String> allTagsList = allTags.toList();
-
         return AlertDialog(
           title: const Text('Select Tag to Filter'),
           content: DropdownButton<String>(
@@ -562,7 +592,7 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
           ),
         ),
         actions: [
-          _buildFilterButton(),
+          // _buildFilterButton(),
           IconButton(
             icon: const Icon(
               Icons.list_outlined,
@@ -581,18 +611,67 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
         backgroundColor: Colors.amber,
       ),
       body: FutureBuilder<void>(
-        future: _fetchAllStops(),
+        future: futureList,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-
           if (snapshot.hasError) {
             return Center(child: Text('Error: ${snapshot.error}'));
           }
+          print(allTagsList);
           // print('routestopmap: $routeStopsMap');
           return Column(
             children: [
+              SizedBox(
+                height: 25,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: allTagsList.length,
+                        itemBuilder: (ctx, index) {
+                          return InkWell(
+                            onTap: () {
+                              if (previousIndex != index) {
+                                setState(() {
+                                  isSelected[previousIndex] = false;
+                                  isSelected[index] = true;
+                                  previousIndex = index;
+                                  if (allTagsList[index] == 'All') {
+                                    selectedTag = null;
+                                  } else {
+                                    selectedTag = allTagsList[index];
+                                  }
+                                });
+                              }
+                              _applyFilter();
+                            },
+                            child: Container(
+                              decoration: isSelected[index]
+                                  ? const BoxDecoration(
+                                      border: Border(
+                                          bottom: BorderSide(
+                                              color: Colors.grey, width: 4)))
+                                  : null,
+                              padding:
+                                  const EdgeInsets.only(left: 10, right: 10),
+                              child: Row(
+                                children: [
+                                  Text(
+                                    allTagsList[index],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               Expanded(
                 flex: 6,
                 child: FlutterMap(
@@ -784,8 +863,10 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) =>
-                                      RouteEditScreen(routeName: routeName),
+                                  builder: (context) => RouteEditScreen(
+                                    routeName: routeName,
+                                    currentLocationData: currentLocation,
+                                  ),
                                 ),
                               );
                               // Implement edit functionality
@@ -970,24 +1051,39 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
               Icons.add_road_sharp,
               color: Colors.white,
             ),
-            onPressed: () {
+            onPressed: () async {
+              String? locationName = await getPlaceName(
+                  currentLocation!.latitude!, currentLocation!.longitude!);
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => RouteCreationScreen(),
+                  builder: (context) => RouteCreationScreen(
+                    locationName: locationName,
+                    currentLocationData: currentLocation,
+                  ),
                 ),
               );
             },
           ),
           const SizedBox(width: 16),
           FloatingActionButton(
-            onPressed: () {
-              Navigator.push(
+            onPressed: () async {
+              String? locationName = await getPlaceName(
+                  currentLocation!.latitude!, currentLocation!.longitude!);
+              await Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => const AddStopScreen(),
+                  builder: (context) => AddStopScreen(
+                    filteredTag: selectedTag,
+                    allTags: allTagsList,
+                    currentLocation: currentLocation,
+                    locationName: locationName,
+                  ),
                 ),
               );
+              setState(() {
+                futureList = _fetchAllStops();
+              });
             },
             backgroundColor: Colors.amber,
             child: const Icon(
