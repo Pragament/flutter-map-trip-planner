@@ -6,7 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 // import 'route_creation_screen.dart';
 // import 'local_notifications.dart';
-import 'route_display_screen.dart';
+import '../screens/route_display_screen.dart';
 
 class RouteTable extends StatefulWidget {
   const RouteTable({Key? key, List<Map<String, dynamic>>? routes});

@@ -5,7 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class ProfileCreationScreen extends StatefulWidget {
   final String phoneNumber;
 
-  ProfileCreationScreen(this.phoneNumber);
+  ProfileCreationScreen(this.phoneNumber, {super.key});
 
   @override
   State<ProfileCreationScreen> createState() => _ProfileCreationScreenState();
@@ -14,7 +14,7 @@ class ProfileCreationScreen extends StatefulWidget {
 class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
   final TextEditingController _dobController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
-  FocusNode _dobFocusNode = FocusNode();
+  final FocusNode _dobFocusNode = FocusNode();
 
   @override
   void initState() {

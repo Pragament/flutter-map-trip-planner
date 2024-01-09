@@ -3,42 +3,47 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:driver_app/add_stop.dart';
+import 'package:animated_text_kit/animated_text_kit.dart';
+import 'package:driver_app/providers/loading_provider.dart';
+import 'package:driver_app/screens/add_stop.dart';
 import 'package:driver_app/screens/login.dart';
 import 'package:driver_app/screens/route_creation_screen.dart';
 import 'package:driver_app/screens/route_edit_screen.dart';
-import 'package:driver_app/route_copy_screen.dart';
-import 'package:driver_app/route_table.dart';
+import 'package:driver_app/screens/route_copy_screen.dart';
+import 'package:driver_app/widgets/route_table.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:location/location.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
+import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:firebase_storage/firebase_storage.dart' as firebase_storage;
 
 Future<String?> getPlaceName(double latitude, double longitude) async {
-  final response = await http.get(
-    Uri.parse(
-      'https://nominatim.openstreetmap.org/reverse?format=json&lat=$latitude&lon=$longitude',
-    ),
-  );
 
-  if (response.statusCode == 200) {
-    Map<String, dynamic> data = json.decode(response.body);
-    return data['display_name'];
-  } else {
-    throw Exception('Failed to load place name');
-  }
+  do{
+    final response = await http.get(
+      Uri.parse(
+        'https://nominatim.openstreetmap.org/reverse?format=json&lat=$latitude&lon=$longitude',
+      ),
+    );
+
+    if (response.statusCode == 200) {
+      Map<String, dynamic> data = json.decode(response.body);
+      return data['display_name'];
+    }
+  } while(true);
 }
 
 class AllRoutesMapScreen extends StatefulWidget {
+  const AllRoutesMapScreen({super.key});
+
   @override
   State<AllRoutesMapScreen> createState() => _AllRoutesMapScreenState();
 }
@@ -59,20 +64,34 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
   List<dynamic> displayedRoutes = [];
 
   String userName = '';
-  String dateofbirth = '';
+  String dateOfBirth = '';
   String phoneNumber = '';
   List<String> allTagsList = ['All'];
   int previousIndex = 0;
   List<bool> isSelected = [];
   Future<List<String>>? futureList;
+  String? locationName;
+  Future<bool>? getLocation;
 
   @override
   void initState() {
     super.initState();
     flutterMapController = MapController();
-    _fetchCurrentLocation();
+    getLocation = _fetchCurrentLocationName();
     isSelected.add(true);
     futureList = _fetchAllStops();
+  }
+
+   Future<bool> _fetchCurrentLocationName() async {
+    Provider.of<LoadingProvider>(context, listen: false)
+        .changeLocationLoadingState(true);
+    await _fetchCurrentLocation();
+    locationName = await getPlaceName(
+        currentLocation!.latitude!, currentLocation!.longitude!);
+    Provider.of<LoadingProvider>(context, listen: false)
+        .changeLocationLoadingState(false);
+    print('Location Fetched : $locationName');
+    return true;
   }
 
   Future<void> _fetchCurrentLocation() async {
@@ -96,9 +115,7 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
 
     try {
       LocationData userLocation = await location.getLocation();
-      setState(() {
         currentLocation = userLocation;
-      });
     } catch (e) {
       print('Error fetching location: $e');
     }
@@ -127,9 +144,8 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
           .collection('users')
           .doc(user.uid)
           .get();
-
       userName = userDoc.get('name');
-      dateofbirth = userDoc.get('dateofbirth');
+      dateOfBirth = userDoc.get('dateofbirth');
       phoneNumber = userDoc.get('phoneNumber');
       List<dynamic> userRoutes = userDoc.get('routes') ?? [];
       userRoutes1 = userRoutes;
@@ -142,35 +158,41 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
       userAddedStops = userAddedStopsData.map((stopData) {
         // Extract latitude and longitude from the selectedpoint string
         String selectedPointString = stopData['selectedPoint'];
-        double latitude = double.parse(
-            selectedPointString.split(',')[0].split(':')[1].trim());
-        double longitude = double.parse(selectedPointString
-            .split(',')[1]
-            .split(':')[1]
-            .replaceAll('}', '')
-            .trim());
-        String stopName = stopData['stop'];
-        String tags1 = stopData['tags'];
-        return {
-          'stop': stopName,
-          'tags': tags1,
-          'point': LatLng(latitude, longitude),
-        };
+        if (selectedPointString.isNotEmpty) {
+          double latitude = double.parse(
+              selectedPointString.split(',')[0].split(':')[1].trim());
+          double longitude = double.parse(selectedPointString
+              .split(',')[1]
+              .split(':')[1]
+              .replaceAll('}', '')
+              .trim());
+          String stopName = stopData['stop'];
+          String tags1 = stopData['tags'];
+          return {
+            'stop': stopName,
+            'tags': tags1,
+            'point': LatLng(latitude, longitude),
+          };
+        }
+        return <String, String>{};
       }).toList();
 
       // Get all tags from routes and user-added stops
-      Set<String> allTags = Set<String>();
+      Set<String> allTags = <String>{};
       allTags.add('All');
       for (var route in userRoutes1) {
         List<String> tags = route['tags'].split(',');
         allTags.addAll(tags);
       }
 
+      userAddedStops.removeWhere((element) => element.isEmpty);
+
       for (var stop in userAddedStops) {
         allTags.addAll(stop['tags'].split(','));
       }
 
       allTagsList = allTags.toList();
+      allTagsList.removeWhere((element) => element.isEmpty);
 
       for (int i = 1; i < allTagsList.length; i++) {
         isSelected.add(false);
@@ -537,6 +559,8 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
 
   @override
   Widget build(BuildContext context) {
+    print('centeredRouteId $centeredRouteId');
+    print('routeStopsMap $routeStopsMap');
     return Scaffold(
       drawer: Drawer(
         surfaceTintColor: Colors.amber,
@@ -559,7 +583,7 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
             const SizedBox(height: 10),
             Text('Name: $userName'),
             const SizedBox(height: 10),
-            Text('Date of Birth: $dateofbirth'),
+            Text('Date of Birth: $dateOfBirth'),
             const SizedBox(height: 10),
             Expanded(child: Text('Phone Number: $phoneNumber')),
             const SizedBox(height: 10),
@@ -592,7 +616,7 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
           ),
         ),
         actions: [
-          // _buildFilterButton(),
+          _buildFilterButton(),
           IconButton(
             icon: const Icon(
               Icons.list_outlined,
@@ -674,63 +698,117 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
               ),
               Expanded(
                 flex: 6,
-                child: FlutterMap(
-                  mapController: flutterMapController,
-                  options: MapOptions(
-                    initialCenter: centeredRouteId != null &&
-                            routeStopsMap.containsKey(centeredRouteId!)
-                        ? routeStopsMap[centeredRouteId!]!.first
-                        : currentLocation != null
-                            ? LatLng(
-                                currentLocation!.latitude!,
-                                currentLocation!.longitude!,
-                              )
-                            : const LatLng(9.75527985137314, 76.64998268216185),
-                    initialZoom: 14.0,
-                  ),
-                  children: [
-                    TileLayer(
-                      urlTemplate:
-                          "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-                    ),
-                    for (var routeId in routeStopsMap.keys)
-                      PolylineLayer(
-                        polylines: [
-                          Polyline(
-                            points: routeStopsMap[routeId]!,
-                            strokeWidth: routeId == selectedRouteId ? 6 : 4,
-                            color: routeId == selectedRouteId
-                                ? Colors.red
-                                : _getRouteColor(
-                                    routeStopsMap.keys
-                                        .toList()
-                                        .indexOf(routeId),
-                                  ),
-                          ),
-                        ],
+                child: FutureBuilder(
+                  future: getLocation,
+                  builder: (context, snapshot) {
+                    if(snapshot.connectionState == ConnectionState.waiting)
+                      {
+                        return Center(
+                          child: AnimatedTextKit(
+                            repeatForever: true,
+                            isRepeatingAnimation: true,
+                            animatedTexts: [
+                            TyperAnimatedText('We are getting your location ...',textStyle: const TextStyle(fontSize: 18)),
+                            TyperAnimatedText('Please wait....', textStyle: const TextStyle(fontSize: 18)),
+                              TyperAnimatedText('Sorry, for the inconvenience.', textStyle: const TextStyle(fontSize: 18)),
+                          ],),
+                        );
+                      }
+                    return FlutterMap(
+                      mapController: flutterMapController,
+                      options: MapOptions(
+                        initialCenter: currentLocation != null
+                                ? LatLng(
+                                    currentLocation!.latitude!,
+                                    currentLocation!.longitude!,
+                                  )
+                                : const LatLng(9.75527985137314, 76.64998268216185),
+                        initialZoom: 14.0,
                       ),
-                    for (var routeId in routeStopsMap.keys)
-                      MarkerLayer(
-                        markers: routeStopsMap[routeId]!.asMap().entries.map(
-                          (entry) {
+                      children: [
+                        TileLayer(
+                          urlTemplate:
+                              "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                        ),
+                        for (var routeId in routeStopsMap.keys)
+                          PolylineLayer(
+                            polylines: [
+                              Polyline(
+                                points: routeStopsMap[routeId]!,
+                                strokeWidth: routeId == selectedRouteId ? 6 : 4,
+                                color: routeId == selectedRouteId
+                                    ? Colors.red
+                                    : _getRouteColor(
+                                        routeStopsMap.keys
+                                            .toList()
+                                            .indexOf(routeId),
+                                      ),
+                              ),
+                            ],
+                          ),
+                        // if(selectedTag == null)
+                        for (var routeId in routeStopsMap.keys)
+                            MarkerLayer(
+                              markers: routeStopsMap[routeId]!.asMap().entries.map(
+                                (entry) {
+                                  int index = entry.key;
+                                  LatLng latLng = entry.value;
+                                  return Marker(
+                                    width: 80.0,
+                                    height: 80.0,
+                                    point: latLng,
+                                    child: Stack(
+                                      children: [
+                                        Positioned(
+                                          top: 17.4,
+                                          left: 28,
+                                          child: Icon(
+                                            Icons.location_on,
+                                            color: routeId == selectedRouteId
+                                                ? Colors.red
+                                                : _getRouteColor(routeStopsMap.keys
+                                                    .toList()
+                                                    .indexOf(routeId)),
+                                          ),
+                                        ),
+                                        Positioned(
+                                          top: 27.4,
+                                          left: 25,
+                                          child: Text(
+                                            '${index + 1}',
+                                            style: TextStyle(
+                                              color: routeId == selectedRouteId
+                                                  ? Colors.red
+                                                  : _getRouteColor(routeStopsMap.keys
+                                                      .toList()
+                                                      .indexOf(routeId)),
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ).toList(),
+                            ),
+                        // if(selectedTag == null)
+                        MarkerLayer(
+                          markers: userAddedStops.asMap().entries.map((entry) {
                             int index = entry.key;
-                            LatLng latLng = entry.value;
+                            LatLng latLng = entry.value['point'];
                             return Marker(
                               width: 80.0,
                               height: 80.0,
                               point: latLng,
                               child: Stack(
                                 children: [
-                                  Positioned(
+                                  const Positioned(
                                     top: 17.4,
                                     left: 28,
                                     child: Icon(
                                       Icons.location_on,
-                                      color: routeId == selectedRouteId
-                                          ? Colors.red
-                                          : _getRouteColor(routeStopsMap.keys
-                                              .toList()
-                                              .indexOf(routeId)),
+                                      color: Colors.black,
                                     ),
                                   ),
                                   Positioned(
@@ -738,12 +816,8 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
                                     left: 25,
                                     child: Text(
                                       '${index + 1}',
-                                      style: TextStyle(
-                                        color: routeId == selectedRouteId
-                                            ? Colors.red
-                                            : _getRouteColor(routeStopsMap.keys
-                                                .toList()
-                                                .indexOf(routeId)),
+                                      style: const TextStyle(
+                                        color: Colors.black,
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
@@ -751,44 +825,11 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
                                 ],
                               ),
                             );
-                          },
-                        ).toList(),
-                      ),
-                    MarkerLayer(
-                      markers: userAddedStops.asMap().entries.map((entry) {
-                        int index = entry.key;
-                        LatLng latLng = entry.value['point'];
-                        return Marker(
-                          width: 80.0,
-                          height: 80.0,
-                          point: latLng,
-                          child: Stack(
-                            children: [
-                              const Positioned(
-                                top: 17.4,
-                                left: 28,
-                                child: Icon(
-                                  Icons.location_on,
-                                  color: Colors.black,
-                                ),
-                              ),
-                              Positioned(
-                                top: 27.4,
-                                left: 25,
-                                child: Text(
-                                  '${index + 1}',
-                                  style: const TextStyle(
-                                    color: Colors.black,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
-                    )
-                  ],
+                          }).toList(),
+                        )
+                      ],
+                    );
+                  },
                 ),
               ),
               Expanded(
@@ -809,6 +850,7 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
                           !tags.split(',').contains(selectedTag)) {
                         return const SizedBox.shrink();
                       }
+                      LatLng? point;
                       return ListTile(
                         title: Row(
                           children: [
@@ -831,10 +873,10 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: routePoints.asMap().entries.map((entry) {
                             int pointIndex = entry.key + 1;
-                            LatLng point = entry.value;
+                             point = entry.value;
                             return FutureBuilder(
                                 future: getPlaceName(
-                                    point.latitude, point.longitude),
+                                    point!.latitude, point!.longitude),
                                 builder: (context, snapshot) {
                                   if (snapshot.connectionState ==
                                       ConnectionState.waiting) {
@@ -851,6 +893,7 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
                         ),
                         onTap: () {
                           setState(() {
+                            flutterMapController.move(LatLng(point!.latitude, point!.longitude), 11);
                             selectedRouteId = routeName;
                             centeredRouteId = routeName;
                           });
@@ -965,6 +1008,7 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
                     } else {
                       // For user-added stops
                       if (userAddedStops.isNotEmpty) {
+                        print(userAddedStops[0]['point'].runtimeType);
                         var userStop =
                             userAddedStops[index - routeStopsMap.length];
                         // print(userStop['tags']);
@@ -985,6 +1029,7 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
                           ),
                           onTap: () {
                             setState(() {
+                              flutterMapController.move(userAddedStops[index - routeStopsMap.length]['point'], 14);
                               centeredRouteId = null;
                             });
                           },
@@ -1045,51 +1090,111 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
       floatingActionButton: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          FloatingActionButton(
-            backgroundColor: Colors.amber,
-            child: const Icon(
-              Icons.add_road_sharp,
-              color: Colors.white,
-            ),
-            onPressed: () async {
-              String? locationName = await getPlaceName(
-                  currentLocation!.latitude!, currentLocation!.longitude!);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => RouteCreationScreen(
-                    locationName: locationName,
-                    currentLocationData: currentLocation,
-                  ),
-                ),
+          Consumer<LoadingProvider>(
+            builder: (BuildContext context, value, Widget? child) {
+              return FloatingActionButton(
+                backgroundColor: Colors.amber,
+                onPressed: value.locationLoading
+                    ? () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text(
+                        'Getting your location',
+                      ),
+                      action: SnackBarAction(
+                          label: 'Ok',
+                          onPressed: ScaffoldMessenger.of(context)
+                              .clearSnackBars),
+                    ),
+                  );
+                }
+                    : () async {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => RouteCreationScreen(
+                              selectedTag: selectedTag,
+                              locationName: locationName,
+                              currentLocationData: currentLocation,
+                              allTags: allTagsList,
+                            ),
+                          ),
+                        );
+                      },
+                child: value.locationLoading
+                    ? const Center(
+                        child: SizedBox(
+                          width: 25,
+                          height: 25,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                          ),
+                        ),
+                      )
+                    : const Icon(
+                        Icons.add_road_sharp,
+                        color: Colors.white,
+                      ),
               );
             },
           ),
           const SizedBox(width: 16),
-          FloatingActionButton(
-            onPressed: () async {
-              String? locationName = await getPlaceName(
-                  currentLocation!.latitude!, currentLocation!.longitude!);
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => AddStopScreen(
-                    filteredTag: selectedTag,
-                    allTags: allTagsList,
-                    currentLocation: currentLocation,
-                    locationName: locationName,
-                  ),
-                ),
+          Consumer<LoadingProvider>(
+            builder:
+                (BuildContext context, LoadingProvider value, Widget? child) {
+              return FloatingActionButton(
+                onPressed: value.locationLoading
+                    ? () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text(
+                              'Getting your location',
+                            ),
+                            action: SnackBarAction(
+                                label: 'Ok',
+                                onPressed: ScaffoldMessenger.of(context)
+                                    .clearSnackBars),
+                          ),
+                        );
+                      }
+                    : () async {
+                  print(locationName);
+                        print("Button Pressed");
+                        bool? result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => AddStopScreen(
+                              filteredTag: selectedTag,
+                              allTags: allTagsList,
+                              currentLocationData: currentLocation,
+                              locationName: locationName,
+                            ),
+                          ),
+                        );
+                        if (result != null && result) {
+                          setState(() {
+                            print('rendered');
+                            futureList = _fetchAllStops();
+                          });
+                        }
+                      },
+                backgroundColor: Colors.amber,
+                child: value.locationLoading
+                    ? const Center(
+                        child: SizedBox(
+                          width: 25,
+                          height: 25,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                          ),
+                        ),
+                      )
+                    : const Icon(
+                        Icons.add_location_alt_outlined,
+                        color: Colors.white,
+                      ),
               );
-              setState(() {
-                futureList = _fetchAllStops();
-              });
             },
-            backgroundColor: Colors.amber,
-            child: const Icon(
-              Icons.add_location_alt_outlined,
-              color: Colors.white,
-            ),
           )
         ],
       ),

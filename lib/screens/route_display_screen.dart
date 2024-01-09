@@ -9,7 +9,7 @@ import 'package:http/http.dart' as http;
 class RouteDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> route;
 
-  RouteDetailsScreen({required this.route});
+  const RouteDetailsScreen({super.key, required this.route});
 
   @override
   State<RouteDetailsScreen> createState() => _RouteDetailsScreenState();

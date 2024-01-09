@@ -1,7 +1,6 @@
 // ignore_for_file: use_build_context_synchronously
 
-import 'package:driver_app/rrule_date_calculator.dart';
-import 'package:driver_app/search_example.dart';
+import 'package:driver_app/utilities/rrule_date_calculator.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -18,7 +17,7 @@ class RouteEditScreen extends StatefulWidget {
   final LocationData? currentLocationData;
 
   @override
-  _RouteEditScreenState createState() => _RouteEditScreenState();
+  State<RouteEditScreen> createState() => _RouteEditScreenState();
 }
 
 class _RouteEditScreenState extends State<RouteEditScreen> {
