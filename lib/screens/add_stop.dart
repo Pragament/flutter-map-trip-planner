@@ -1,6 +1,7 @@
 // ignore_for_file: use_build_context_synchronously
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:driver_app/providers/loading_provider.dart';
 import 'package:driver_app/screens/all_routes.dart';
 import 'package:driver_app/widgets/tags_auto_completion.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -10,6 +11,7 @@ import 'package:flutter_osm_plugin/flutter_osm_plugin.dart';
 import 'package:flutter_osm_interface/flutter_osm_interface.dart' as osm;
 import 'package:latlong2/latlong.dart';
 import 'package:location/location.dart';
+import 'package:provider/provider.dart';
 import 'package:textfield_tags/textfield_tags.dart';
 
 class AddStopScreen extends StatefulWidget {
@@ -23,7 +25,7 @@ class AddStopScreen extends StatefulWidget {
 
   final String? filteredTag;
   late List<String>? allTags;
-  final LocationData? currentLocationData;
+  LocationData? currentLocationData;
   final String? locationName;
 
   @override
@@ -51,7 +53,9 @@ class _AddStopScreenState extends State<AddStopScreen> {
     if (widget.filteredTag != null) {
       displayTags.add(widget.filteredTag!);
     }
-    locationPoint = LatLng(widget.currentLocationData!.latitude!, widget.currentLocationData!.longitude!);
+
+    locationPoint = LatLng(widget.currentLocationData!.latitude!,
+        widget.currentLocationData!.longitude!);
   }
 
   String _selectedPoint = "";
@@ -80,12 +84,16 @@ class _AddStopScreenState extends State<AddStopScreen> {
                   tag += '${tagsList[i]},';
                 }
               }
-              RegExp commaSeparatedTags =
-              RegExp(r'^[a-zA-Z]+(?:,[a-zA-Z]+)*$');
+              RegExp commaSeparatedTags = RegExp(r'^[a-zA-Z]+(?:,[a-zA-Z]+)*$');
+              print(_stopController.text);
+              print(_textfieldTagsController.getTags);
+              print(tag);
+              print(_selectedPoint);
+              print(commaSeparatedTags.hasMatch(tag));
 
-              if (stop.isNotEmpty &&
+              if (_stopController.text.isNotEmpty &&
                   tag.isNotEmpty &&
-                  commaSeparatedTags.hasMatch(tag) &&  _selectedPoint.trim().isNotEmpty) {
+                  commaSeparatedTags.hasMatch(tag)) {
                 try {
                   User? user = FirebaseAuth.instance.currentUser;
                   if (user != null) {
@@ -172,7 +180,10 @@ class _AddStopScreenState extends State<AddStopScreen> {
                 hintText: 'wanna select from map? Click here 👉🏻',
                 suffixIcon: GestureDetector(
                   onTap: () async {
-                    osm.GeoPoint selectedLocation = osm.GeoPoint(
+                    osm.GeoPoint selectedLocation = locationPoint != null ? osm.GeoPoint(
+                      latitude: locationPoint!.latitude,
+                      longitude: locationPoint!.longitude,
+                    ) : osm.GeoPoint(
                       latitude: widget.currentLocationData!.latitude!,
                       longitude: widget.currentLocationData!.longitude!,
                     );
@@ -197,7 +208,8 @@ class _AddStopScreenState extends State<AddStopScreen> {
                       });
                       _stopController.text =
                           (await getPlaceName(latitude, longitude))!;
-                      flutterMapController.move(LatLng(latitude, longitude), 14);
+                      flutterMapController.move(
+                          LatLng(latitude, longitude), 14);
                     }
                   },
                   child: const Icon(Icons.location_searching_rounded),
@@ -229,41 +241,88 @@ class _AddStopScreenState extends State<AddStopScreen> {
               ),
             ),
             const SizedBox(height: 20),
-           Expanded(
-                  child: flutterMap.FlutterMap(
-                    mapController: flutterMapController,
-                    options: flutterMap.MapOptions(
-                      initialCenter: locationPoint!,
-                      initialZoom: 14.0,
-                    ),
-                    children: [
-                      flutterMap.TileLayer(
-                        urlTemplate:
-                        "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+            Expanded(
+              child: Stack(
+                children: [
+                  Positioned(
+                    child: flutterMap.FlutterMap(
+                      mapController: flutterMapController,
+                      options: flutterMap.MapOptions(
+                        initialCenter: locationPoint!,
+                        initialZoom: 14.0,
                       ),
-                      flutterMap.MarkerLayer(
-                        markers: [
-                          flutterMap.Marker(
-                            width: 80.0,
-                            height: 80.0,
-                            point: locationPoint!,
-                            child: const Stack(
-                              children: [
-                                Positioned(
-                                  top: 17.4,
-                                  left: 28,
-                                  child: Icon(
-                                    Icons.location_on,
-                                    color: Colors.black,
-                                  ),
-                                ),
-                              ],
+                      children: [
+                        flutterMap.TileLayer(
+                          urlTemplate:
+                              "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                        ),
+                        flutterMap.MarkerLayer(
+                          markers: [
+                            flutterMap.Marker(
+                              width: 80.0,
+                              height: 80.0,
+                              point: locationPoint!,
+                              child: const Icon(
+                                Icons.location_on,
+                                color: Colors.black,
+                              ),
                             ),
-                          )
-                        ],
-                      ),
-                    ],
+                            flutterMap.Marker(
+                              width: 80.0,
+                              height: 80.0,
+                              point: LatLng(widget.currentLocationData!.latitude!, widget.currentLocationData!.longitude!),
+                              child:  const Icon(
+                                Icons.circle_outlined,
+                                color: Colors.black,
+                                size: 26,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
+                  Positioned(
+                    bottom: 10,
+                    right: 10,
+                    child: Consumer<LoadingProvider>(
+                      builder: (BuildContext context,
+                          LoadingProvider loadingProvider, Widget? child) {
+                        return FloatingActionButton(
+                          onPressed: () async {
+                            loadingProvider
+                                .changeAddStopsUpdateLocationState(true);
+                            widget.currentLocationData = await fetchCurrentLocation();
+                            loadingProvider
+                                .changeAddStopsUpdateLocationState(false);
+                            print('Updated Location  ==>  $widget.currentLocationData');
+                            flutterMapController.move(
+                                LatLng(
+                                  widget.currentLocationData!.latitude!,
+                                  widget.currentLocationData!.longitude!,
+                                ),
+                                14);
+                            // _stopController.text = (await getPlaceName(widget.currentLocationData!.latitude!, widget.currentLocationData!.longitude!))!;
+                          },
+                          child: loadingProvider.addStopUpdateLocation
+                              ? const Center(
+                                  child: SizedBox(
+                                    width: 25,
+                                    height: 25,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.location_searching,
+                                ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),

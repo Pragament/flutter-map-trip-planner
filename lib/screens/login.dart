@@ -23,6 +23,7 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
   Future<void> _verifyPhoneNumber() async {
     verificationCompleted(PhoneAuthCredential phoneAuthCredential) async {
       await _auth.signInWithCredential(phoneAuthCredential);
+      print('PHONE NUMBER VERIFIED');
       setState(() {
         isPhoneNumberVerified = true;
       });
@@ -52,6 +53,7 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
     }
 
     codeSent(String verificationId, int? resendToken) async {
+      print('verificationId - $verificationId');
       this.verificationId = verificationId;
       setState(() {
         isPhoneNumberVerified = true;
@@ -77,6 +79,7 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
       smsCode: _otpController.text,
     );
 
+    print("CREDENTIALS VERIFIED");
     await _auth.signInWithCredential(credential);
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setString('login_timestamp', DateTime.now().toString());
@@ -90,6 +93,7 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
       Navigator.pushReplacementNamed(context, '/allroutes');
     } else {
       // Profile doesn't exist, navigate to the profile creation page
+      print("NEW USER");
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(

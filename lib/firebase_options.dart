@@ -17,24 +17,15 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      throw UnsupportedError(
-        'DefaultFirebaseOptions have not been configured for web - '
-        'you can reconfigure this by running the FlutterFire CLI again.',
-      );
+      return web;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
         return android;
       case TargetPlatform.iOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for ios - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return ios;
       case TargetPlatform.macOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for macos - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return macos;
       case TargetPlatform.windows:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for windows - '
@@ -52,11 +43,39 @@ class DefaultFirebaseOptions {
     }
   }
 
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyDk_JRkfxjphcIxUyk1YN5zQ5EUKzNfg5E',
+    appId: '1:117481681716:web:85e3b9b28fd139b1fbab61',
+    messagingSenderId: '117481681716',
+    projectId: 'driver-map-planner-dev',
+    authDomain: 'driver-map-planner-dev.firebaseapp.com',
+    storageBucket: 'driver-map-planner-dev.appspot.com',
+    measurementId: 'G-CLFPPK7KD9',
+  );
+
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyCV8AjeM4UTIm366KqKbijlDRahRevqL2A',
-    appId: '1:1059455509285:android:26142707d9d99d6e8830cc',
-    messagingSenderId: '1059455509285',
-    projectId: 'drivers-app-2ee04',
-    storageBucket: 'drivers-app-2ee04.appspot.com',
+    apiKey: 'AIzaSyA5Uk4f9UDhF0ri9qQjNb5-F_-H7iGxn1k',
+    appId: '1:117481681716:android:d07d69e794a4f191fbab61',
+    messagingSenderId: '117481681716',
+    projectId: 'driver-map-planner-dev',
+    storageBucket: 'driver-map-planner-dev.appspot.com',
+  );
+
+  static const FirebaseOptions ios = FirebaseOptions(
+    apiKey: 'AIzaSyAInK-jUPlZVyZeyzZQhghTrcBPdtSCvyk',
+    appId: '1:117481681716:ios:801a8063962d3142fbab61',
+    messagingSenderId: '117481681716',
+    projectId: 'driver-map-planner-dev',
+    storageBucket: 'driver-map-planner-dev.appspot.com',
+    iosBundleId: 'com.example.driverApp',
+  );
+
+  static const FirebaseOptions macos = FirebaseOptions(
+    apiKey: 'AIzaSyAInK-jUPlZVyZeyzZQhghTrcBPdtSCvyk',
+    appId: '1:117481681716:ios:881b9e8a6250f57efbab61',
+    messagingSenderId: '117481681716',
+    projectId: 'driver-map-planner-dev',
+    storageBucket: 'driver-map-planner-dev.appspot.com',
+    iosBundleId: 'com.example.driverApp.RunnerTests',
   );
 }

@@ -1,6 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 
+import 'package:driver_app/screens/overlay.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 
 import 'firebase_options.dart';
 import 'package:driver_app/providers/loading_provider.dart';
@@ -29,7 +32,6 @@ void main() async {
   });
   await Permission.notification.isGranted
       .then((value) => LocalNotifications.init());
-
   // Get the saved login timestamp from SharedPreferences
   SharedPreferences prefs = await SharedPreferences.getInstance();
   String? loginTimestamp = prefs.getString('login_timestamp');
@@ -84,8 +86,47 @@ void main() async {
     }
   }
 
+  if (!await FlutterOverlayWindow.isPermissionGranted()) {
+    await FlutterOverlayWindow.requestPermission();
+  }
+
   runApp(
     MyApp(isSignedInWithin5Days, routes),
+  );
+}
+
+@pragma("vm:entry-point")
+void overlayMain() {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(
+    MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Material(
+        color: Colors.yellow[200],     // teal, green, blue, deepPurple
+        child: const Column(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+           Row(
+             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+             children: [
+               Padding(
+                 padding: EdgeInsets.only(left: 10.0),
+                 child: Text(
+                   'Next Stop :',
+                   style: TextStyle(fontSize: 19, fontWeight: FontWeight.w600),
+                 ),
+               ),
+               IconButton(
+                  onPressed: FlutterOverlayWindow.closeOverlay,
+                  icon: Icon(Icons.cancel_rounded, size: 25,),
+                ),
+             ],
+           ),
+           Expanded(child: OverLayScreen()),
+        ],
+        ),
+      ),
+    ),
   );
 }
 
@@ -148,7 +189,7 @@ class _MyAppState extends State<MyApp> {
       child: MaterialApp(
         title: 'Driver App',
         theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+          colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple,),
           useMaterial3: true,
         ),
         home: widget.isSignedInWithin5Days
@@ -158,7 +199,7 @@ class _MyAppState extends State<MyApp> {
         routes: {
           '/routetable': (context) => RouteTable(routes: widget.routes),
           '/login': (context) => PhoneAuthScreen(),
-          '/allroutes': (context) => AllRoutesMapScreen(),
+          '/allroutes': (context) => const AllRoutesMapScreen(),
         },
       ),
     );
