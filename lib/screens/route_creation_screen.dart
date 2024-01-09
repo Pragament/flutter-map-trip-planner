@@ -9,14 +9,16 @@ import 'package:flutter_map/flutter_map.dart' as flutterMap;
 import 'package:flutter_osm_plugin/flutter_osm_plugin.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:location/location.dart';
+import 'package:provider/provider.dart';
 import 'package:rrule_generator/rrule_generator.dart';
 import 'package:flutter_osm_interface/flutter_osm_interface.dart' as osm;
 import 'package:textfield_tags/textfield_tags.dart';
+import '../providers/loading_provider.dart';
 import 'all_routes.dart';
 import '../utilities/rrule_date_calculator.dart';
 
 class RouteCreationScreen extends StatefulWidget {
-  const RouteCreationScreen({
+  RouteCreationScreen({
     required this.currentLocationData,
     required this.locationName,
     required this.selectedTag,
@@ -24,7 +26,7 @@ class RouteCreationScreen extends StatefulWidget {
     super.key,
   });
 
-  final LocationData? currentLocationData;
+  late LocationData? currentLocationData;
   final String? locationName;
   final String? selectedTag;
   final List<String>? allTags;
@@ -490,63 +492,104 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
               child: const Text('Add Stop'),
             ),
             Expanded(
-              child: flutterMap.FlutterMap(
-                mapController: flutterMapController,
-                options: flutterMap.MapOptions(
-                  initialCenter: LatLng(
-                    widget.currentLocationData!.latitude!,
-                    widget.currentLocationData!.longitude!,
+              child: Stack(
+                children:[ flutterMap.FlutterMap(
+                  mapController: flutterMapController,
+                  options: flutterMap.MapOptions(
+                    initialCenter: LatLng(
+                      widget.currentLocationData!.latitude!,
+                      widget.currentLocationData!.longitude!,
+                    ),
+                    initialZoom: 14.0,
                   ),
-                  initialZoom: 14.0,
-                ),
-                children: [
-                  flutterMap.TileLayer(
-                    urlTemplate:
-                        "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-                  ),
-                  flutterMap.PolylineLayer(
-                    polylines: [
-                      flutterMap.Polyline(
-                        points: stops,
-                        strokeWidth: 4,
-                        color: Colors.blue,
-                      ),
-                    ],
-                  ),
-                  flutterMap.MarkerLayer(
-                    markers: [
-                      for (int i = 0; i < stops.length; i++)
-                        flutterMap.Marker(
-                          width: 80.0,
-                          height: 80.0,
-                          point: stops[i],
-                          child: Stack(
-                            children: [
-                              const Positioned(
-                                top: 17.4,
-                                left: 28,
-                                child: Icon(
-                                  Icons.location_on,
-                                  color: Colors.black,
-                                ),
-                              ),
-                              Positioned(
-                                top: 27.4,
-                                left: 25,
-                                child: Text(
-                                  '${i + 1}',
-                                  style: const TextStyle(
+                  children: [
+                    flutterMap.TileLayer(
+                      urlTemplate:
+                          "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                    ),
+                    flutterMap.PolylineLayer(
+                      polylines: [
+                        flutterMap.Polyline(
+                          points: stops,
+                          strokeWidth: 4,
+                          color: Colors.blue,
+                        ),
+                      ],
+                    ),
+                    flutterMap.MarkerLayer(
+                      markers: [
+                        for (int i = 0; i < stops.length; i++)
+                          flutterMap.Marker(
+                            width: 80.0,
+                            height: 80.0,
+                            point: stops[i],
+                            child: Stack(
+                              children: [
+                                const Positioned(
+                                  top: 17.4,
+                                  left: 28,
+                                  child: Icon(
+                                    Icons.location_on,
                                     color: Colors.black,
-                                    fontWeight: FontWeight.bold,
                                   ),
                                 ),
+                                Positioned(
+                                  top: 27.4,
+                                  left: 25,
+                                  child: Text(
+                                    '${i + 1}',
+                                    style: const TextStyle(
+                                      color: Colors.black,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                      ],
+                    ),
+                  ],
+                ),
+                  Positioned(
+                    bottom: 10,
+                    right: 10,
+                    child: Consumer<LoadingProvider>(
+                      builder: (BuildContext context,
+                          LoadingProvider loadingProvider, Widget? child) {
+                        return FloatingActionButton(
+                          onPressed: () async {
+                            loadingProvider
+                                .changeRouteCreationUpdateLocationState(true);
+                            widget.currentLocationData = await fetchCurrentLocation();
+                            loadingProvider
+                                .changeRouteCreationUpdateLocationState(false);
+                            print('Updated Location  ==>  $widget.currentLocationData');
+                            flutterMapController.move(
+                                LatLng(
+                                  widget.currentLocationData!.latitude!,
+                                  widget.currentLocationData!.longitude!,
+                                ),
+                                14);
+                          },
+                          child: loadingProvider.routeCreationUpdateLocation
+                              ? const Center(
+                            child: SizedBox(
+                              width: 25,
+                              height: 25,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
                               ),
-                            ],
+                            ),
+                          )
+                              : const Icon(
+                            Icons.location_searching,
                           ),
-                        )
-                    ],
+                        );
+                      },
+                    ),
                   ),
-                ],
+              ],
               ),
             ),
             // ValueListenableBuilder<String?>(

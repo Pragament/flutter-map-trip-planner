@@ -1,9 +1,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/>
     <application
         android:enableOnBackInvokedCallback="true"
         android:label="DriverApp"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <service android:name="flutter.overlay.window.flutter_overlay_window.OverlayService" android:exported="false" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

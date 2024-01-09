@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "1059455509285",
-    "project_id": "drivers-app-2ee04",
-    "storage_bucket": "drivers-app-2ee04.appspot.com"
+    "project_number": "117481681716",
+    "project_id": "driver-map-planner-dev",
+    "storage_bucket": "driver-map-planner-dev.appspot.com"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:1059455509285:android:26142707d9d99d6e8830cc",
+        "mobilesdk_app_id": "1:117481681716:android:d07d69e794a4f191fbab61",
         "android_client_info": {
           "package_name": "com.example.driver_app"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyCV8AjeM4UTIm366KqKbijlDRahRevqL2A"
+          "current_key": "AIzaSyA5Uk4f9UDhF0ri9qQjNb5-F_-H7iGxn1k"
         }
       ],
       "services": {
