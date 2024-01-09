@@ -53,12 +53,23 @@ class _AddStopScreenState extends State<AddStopScreen> {
     if (widget.filteredTag != null) {
       displayTags.add(widget.filteredTag!);
     }
-
     locationPoint = LatLng(widget.currentLocationData!.latitude!,
         widget.currentLocationData!.longitude!);
+    marker = marker = flutterMap.Marker(
+      width: 80.0,
+      height: 80.0,
+      point: LatLng(widget.currentLocationData!.latitude!, widget.currentLocationData!.longitude!),
+      child:  const Icon(
+        Icons.circle_sharp,
+        color: Colors.blue,
+        size: 16,
+      ),
+    );
   }
 
   String _selectedPoint = "";
+
+  late flutterMap.Marker marker;
 
   @override
   Widget build(BuildContext context) {
@@ -267,16 +278,7 @@ class _AddStopScreenState extends State<AddStopScreen> {
                                 color: Colors.black,
                               ),
                             ),
-                            flutterMap.Marker(
-                              width: 80.0,
-                              height: 80.0,
-                              point: LatLng(widget.currentLocationData!.latitude!, widget.currentLocationData!.longitude!),
-                              child:  const Icon(
-                                Icons.circle_outlined,
-                                color: Colors.black,
-                                size: 26,
-                              ),
-                            ),
+                            marker,
                           ],
                         ),
                       ],
@@ -295,13 +297,25 @@ class _AddStopScreenState extends State<AddStopScreen> {
                             widget.currentLocationData = await fetchCurrentLocation();
                             loadingProvider
                                 .changeAddStopsUpdateLocationState(false);
-                            print('Updated Location  ==>  $widget.currentLocationData');
+                            print('Updated Location  ==>  ${widget.currentLocationData}');
                             flutterMapController.move(
                                 LatLng(
                                   widget.currentLocationData!.latitude!,
                                   widget.currentLocationData!.longitude!,
                                 ),
                                 14);
+                            setState(() {
+                              marker = marker = flutterMap.Marker(
+                                width: 80.0,
+                                height: 80.0,
+                                point: LatLng(widget.currentLocationData!.latitude!, widget.currentLocationData!.longitude!),
+                                child:  const Icon(
+                                  Icons.circle_sharp,
+                                  color: Colors.blue,
+                                  size: 16,
+                                ),
+                              );
+                            });
                             // _stopController.text = (await getPlaceName(widget.currentLocationData!.latitude!, widget.currentLocationData!.longitude!))!;
                           },
                           child: loadingProvider.addStopUpdateLocation

@@ -112,7 +112,7 @@ void overlayMain() {
                Padding(
                  padding: EdgeInsets.only(left: 10.0),
                  child: Text(
-                   'Next Stop :',
+                   'Nearest Stop :',
                    style: TextStyle(fontSize: 19, fontWeight: FontWeight.w600),
                  ),
                ),

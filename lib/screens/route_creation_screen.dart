@@ -47,6 +47,7 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
   List<LatLng> stops = [];
   List<String> displayTags = [];
   late TextfieldTagsController _textfieldTagsController;
+  late flutterMap.Marker marker;
 
   @override
   void initState() {
@@ -55,6 +56,16 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
     if (widget.selectedTag != null) {
       displayTags.add(widget.selectedTag!);
     }
+    marker = flutterMap.Marker(
+      width: 80.0,
+      height: 80.0,
+      point: LatLng(widget.currentLocationData!.latitude!, widget.currentLocationData!.longitude!),
+      child:  const Icon(
+        Icons.circle_sharp,
+        color: Colors.blue,
+        size: 16,
+      ),
+    );
     osm.GeoPoint geoPoint = osm.GeoPoint(
         latitude: widget.currentLocationData!.latitude!,
         longitude: widget.currentLocationData!.longitude!);
@@ -546,7 +557,8 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
                                 ),
                               ],
                             ),
-                          )
+                          ),
+                        marker,
                       ],
                     ),
                   ],
@@ -565,6 +577,18 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
                             loadingProvider
                                 .changeRouteCreationUpdateLocationState(false);
                             print('Updated Location  ==>  $widget.currentLocationData');
+                            setState(() {
+                              marker = flutterMap.Marker(
+                                width: 80.0,
+                                height: 80.0,
+                                point: LatLng(widget.currentLocationData!.latitude!, widget.currentLocationData!.longitude!),
+                                child:  const Icon(
+                                  Icons.circle_sharp,
+                                  color: Colors.blue,
+                                  size: 16,
+                                ),
+                              );
+                            });
                             flutterMapController.move(
                                 LatLng(
                                   widget.currentLocationData!.latitude!,

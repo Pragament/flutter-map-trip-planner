@@ -26,29 +26,27 @@ class _OverLayScreenState extends State<OverLayScreen> {
     });
     return Container(
       margin: const EdgeInsets.only(left: 10, right: 10, bottom: 10),
-      child: SingleChildScrollView(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Center(
-              child: Icon(Icons.route_sharp),
-            ),
-            const SizedBox(
-              width: 10,
-            ),
-            Expanded(
-              child: Text(
-                nextStop,
-                maxLines: 10,    // 3
-                style: const TextStyle(
-                  fontSize: 16,
-                  overflow: TextOverflow.ellipsis,
-                ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Center(
+            child: Icon(Icons.route_sharp),
+          ),
+          const SizedBox(
+            width: 10,
+          ),
+          Expanded(
+            child: Text(
+              nextStop,
+              maxLines: 3,    // 3
+              style: const TextStyle(
+                fontSize: 16,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
