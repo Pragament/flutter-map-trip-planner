@@ -39,7 +39,7 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
   final TextEditingController _routeNameController = TextEditingController();
   final List<TextEditingController> _stopControllers = [];
   final List<TextEditingController> _stopNameControllers = [];
-  final TextEditingController _stopnameController = TextEditingController();
+  final TextEditingController _stopNameController = TextEditingController();
   List<Map<String, dynamic>> displayedUserAddedStops = [];
   List<Map<String, dynamic>> copy = [];
   final List<FocusNode> _stopFocusNodes = [FocusNode()];
@@ -88,7 +88,7 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
     setState(() {
       if (index >= 0 && index < _stopControllers.length) {
         var removedStop = _stopControllers[index].text;
-        var stopname = _stopnameController.text;
+        var stopname = _stopNameController.text;
         print(copy);
         bool isStopInCopy = copy.any((e) => e['selectedPoint'] == removedStop);
         if (isStopInCopy) {
@@ -446,7 +446,6 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
                                 )),
                           ),
                         ),
-                        if (index >= 1)
                           IconButton(
                             icon: const Icon(Icons.remove_circle),
                             onPressed: () => _removeStop(index),

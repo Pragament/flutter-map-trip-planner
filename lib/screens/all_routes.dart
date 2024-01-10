@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:animated_text_kit/animated_text_kit.dart';
 import 'package:driver_app/providers/loading_provider.dart';
@@ -588,23 +589,53 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
     locationStreamSubscription.cancel();
   }
 
+  double calculateDistance(LatLng point1, LatLng point2) {
+    const double earthRadius = 6371; // Earth's radius in kilometers
+
+    // Convert latitude and longitude from degrees to radians
+    double lat1 = radians(point1.latitude);
+    double lon1 = radians(point1.longitude);
+    double lat2 = radians(point2.latitude);
+    double lon2 = radians(point2.longitude);
+
+    // Haversine formula
+    double dLat = lat2 - lat1;
+    double dLon = lon2 - lon1;
+
+    double a = sin(dLat / 2) * sin(dLat / 2) +
+        cos(lat1) * cos(lat2) * sin(dLon / 2) * sin(dLon / 2);
+
+    double c = 2 * atan2(sqrt(a), sqrt(1 - a));
+
+    // Distance in kilometers
+    double distance = earthRadius * c;
+
+    return distance;
+  }
+
+  double radians(double degrees) {
+    return degrees * (pi / 180);
+  }
+
   Future<void> getNextStop(List<LatLng> stops) async {
     List<LatLng> routeStops = [...stops];
     location.enableBackgroundMode(enable: true);
 
     locationStreamSubscription.onData((userLocation) async {
-      print('TIMER : ${DateTime.now().second}');
-      double latDifference = 100;
-      // double lngDifference = 100;
+      double minDistance = double.infinity;
       int index = 0;
+
       for (int i = 0; i < routeStops.length; i++) {
-        double difference =
-            (userLocation.latitude! - routeStops[i].latitude).abs();
-        if (difference < latDifference) {
+        double distance = calculateDistance(
+            LatLng(userLocation.latitude!, userLocation.longitude!),
+            routeStops[i]);
+        if (distance < minDistance) {
           index = i;
-          latDifference = difference;
+          minDistance = distance;
         }
       }
+      print('INDEX $index');
+      print('MINDIFERENCE $minDistance');
       LatLng nearestStop = routeStops[index];
       routeStops.removeAt(index);
       routeStops.insert(0, nearestStop);
@@ -612,11 +643,10 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
       if (routeStops.isNotEmpty) {
         String? locationName =
             await getPlaceName(routeStops[0].latitude, routeStops[0].longitude);
-        if(nextStop != locationName)
-          {
-            nextStop = locationName!;
-            await FlutterOverlayWindow.shareData(locationName);
-          }
+        if (nextStop != locationName) {
+          nextStop = locationName!;
+          await FlutterOverlayWindow.shareData(locationName);
+        }
       }
       double stopMinLatitude = routeStops[0].latitude - 0.002;
       double stopMaxLatitude = routeStops[0].latitude + 0.002;
@@ -627,8 +657,6 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
           userLocation.longitude! <= stopMaxLongitude &&
           stopMinLatitude <= userLocation.latitude! &&
           userLocation.latitude! <= stopMaxLatitude) {
-        print(
-            'LOCATION REACHED !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
         stop++;
         if (stop == stops.length) {
           nextStop = 'Reached';
@@ -637,7 +665,7 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
           return;
         }
         index = 0;
-        latDifference = 100;
+        minDistance = double.infinity;
         routeStops.removeAt(0);
       }
     });
@@ -702,19 +730,18 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
         actions: [
           // _buildFilterButton(),
           IconButton(
-            icon: const Icon(
-              Icons.list_outlined,
-              color: Colors.white,
-            ),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const RouteTable(),
-                ),
-              );
-            },
-          ),
+              icon: const Icon(
+                Icons.list_outlined,
+                color: Colors.white,
+              ),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const RouteTable(),
+                  ),
+                );
+              }),
         ],
         backgroundColor: Colors.amber,
       ),
@@ -1139,6 +1166,7 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
                                       builder: (context) => RouteEditScreen(
                                         routeName: routeName,
                                         currentLocationData: currentLocation,
+                                        allTags: allTagsList,
                                       ),
                                     ),
                                   );
@@ -1222,7 +1250,9 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
                                           routeStopsMap[routeName]!;
                                       print('stops $stops');
                                       _startNavigation(stops);
-                                      locationStreamSubscription = location.onLocationChanged.listen((event) {});
+                                      locationStreamSubscription = location
+                                          .onLocationChanged
+                                          .listen((event) {});
                                       nextStop = 'Getting Location ...';
                                       stop = 0;
                                       FlutterOverlayWindow.showOverlay(

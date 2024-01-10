@@ -21,6 +21,7 @@ class _OverLayScreenState extends State<OverLayScreen> {
   Widget build(BuildContext context) {
     nextStopStreamSubscription.onData((data) {
       setState(() {
+        print('NEAREST STOP : $data');
         nextStop = data;
       });
     });
