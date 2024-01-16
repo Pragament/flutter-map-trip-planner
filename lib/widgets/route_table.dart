@@ -1,11 +1,9 @@
 // import 'dart:convert';
 
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
-// import 'route_creation_screen.dart';
-// import 'local_notifications.dart';
+import 'package:provider/provider.dart';
+import '../providers/route_provider.dart';
 import '../screens/route_display_screen.dart';
 
 class RouteTable extends StatefulWidget {
@@ -16,37 +14,20 @@ class RouteTable extends StatefulWidget {
 }
 
 class _RouteTableState extends State<RouteTable> {
-  List<Map<String, dynamic>>? _routes;
+  List<dynamic>? _routes;
 
-  Future<List<Map<String, dynamic>>> _fetchRoutes() async {
-    User? user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      DocumentSnapshot<Map<String, dynamic>> userDoc = await FirebaseFirestore
-          .instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-      List<Map<String, dynamic>> routes = List<Map<String, dynamic>>.from(
-          userDoc.get('routes') ?? [] as List<Map<String, dynamic>>);
-      return routes;
+  void _fetchRoutes() {
+      _routes =  Provider.of<RouteProvider>(context, listen: false).userRoutes;
     }
-    return [];
-  }
 
   @override
   void initState() {
     // listenToNotifications();
     super.initState();
-    _init();
+    _fetchRoutes();
   }
 
-  Future<void> _init() async {
-    List<Map<String, dynamic>> routes = await _fetchRoutes();
-    setState(() {
-      _routes = routes;
-    });
-    // _sendNotificationIfNearestDateIsToday();
-  }
+
 
   // void _sendNotificationIfNearestDateIsToday() {
   //   print('Checking');

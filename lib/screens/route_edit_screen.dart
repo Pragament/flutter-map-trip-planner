@@ -1,19 +1,25 @@
 // ignore_for_file: use_build_context_synchronously
 
-import 'package:driver_app/screens/all_routes.dart';
-import 'package:driver_app/utilities/rrule_date_calculator.dart';
-import 'package:driver_app/widgets/tags_auto_completion.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+
+import 'package:animated_text_kit/animated_text_kit.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_map/flutter_map.dart' as flutterMap;
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_osm_plugin/flutter_osm_plugin.dart';
 import 'package:flutter_osm_interface/flutter_osm_interface.dart' as osm;
 import 'package:latlong2/latlong.dart';
 import 'package:location/location.dart';
+import 'package:provider/provider.dart';
 import 'package:rrule_generator/rrule_generator.dart';
 import 'package:textfield_tags/textfield_tags.dart';
+
+import 'package:driver_app/providers/loading_provider.dart';
+import 'package:driver_app/utilities/rrule_date_calculator.dart';
+import 'package:driver_app/widgets/tags_auto_completion.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../providers/route_provider.dart';
+import '../utilities/location_functions.dart';
 
 class RouteEditScreen extends StatefulWidget {
   const RouteEditScreen({
@@ -42,7 +48,6 @@ class _RouteEditScreenState extends State<RouteEditScreen> {
   String? savedRRule;
   String? routeId;
   late List<LatLng> userAddedStops;
-  late Future<bool> routeData;
   List<String> displayTags = [];
   late TextfieldTagsController _textfieldTagsController;
 
@@ -55,57 +60,106 @@ class _RouteEditScreenState extends State<RouteEditScreen> {
     _stopControllers = [];
     userAddedStops = [];
     // _tagsController = TextEditingController();
-    routeData = _fetchRouteDetails();
+    _fetchRouteDetails();
   }
 
   Future<bool> _fetchRouteDetails() async {
     try {
-      User? user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        print("user: $user");
-        DocumentSnapshot<Map<String, dynamic>> userDoc = await FirebaseFirestore
-            .instance
-            .collection('users')
-            .doc(user.uid)
-            .get();
-        List<dynamic> userRoutes = userDoc.get('routes') ?? [];
-        var selectedRoute = userRoutes.firstWhere(
-            (route) => route['routeName'] == widget.routeName,
-            orElse: () => null);
-        print('STOP GEO POINT TYPE -- ${selectedRoute['stops'][0]}');
-        if (selectedRoute != null) {
-          _routeNameController.text = selectedRoute['routeName'];
-          displayTags.add(selectedRoute['tags']);
-          // _tagsController.text = selectedRoute['tags'];
-          generatedRRuleNotifier.value = selectedRoute['rrule'];
-          List<dynamic> stops = selectedRoute['stops'];
-          routeId = selectedRoute['routeID'];
-          for (int i = 0; i < stops.length; i++) {
-            double latitude =
-                double.parse(stops[i].split(',')[0].split(':')[1].trim());
-            double longitude = double.parse(stops[i]
-                .split(',')[1]
-                .split(':')[1]
-                .replaceAll('}', '')
-                .trim());
-            userAddedStops.add(LatLng(latitude, longitude));
-            String? locationName = await getPlaceName(latitude, longitude);
-            _stopNameControllers.add(
-              TextEditingController(text: locationName),
-            );
-            _stopControllers.add(
-              TextEditingController(text: stops[i]),
-            );
-          }
+      // User? user = FirebaseAuth.instance.currentUser;
+      // if (user != null) {
+      //   print("user: $user");
+      // DocumentSnapshot<Map<String, dynamic>> userDoc = await FirebaseFirestore
+      //     .instance
+      //     .collection('users')
+      //     .doc(user.uid)
+      //     .get();
+      // List<dynamic> userRoutes = userDoc.get('routes') ?? [];
+      List<dynamic> userRoutes =
+          Provider.of<RouteProvider>(context, listen: false).userRoutes;
+      var selectedRoute = userRoutes.firstWhere(
+          (route) => route['routeName'] == widget.routeName,
+          orElse: () => null);
+      print('STOP GEO POINT TYPE -- ${selectedRoute['stops'][0]}');
+      if (selectedRoute != null) {
+        _routeNameController.text = selectedRoute['routeName'];
+        displayTags.add(selectedRoute['tags']);
+        // _tagsController.text = selectedRoute['tags'];
+        generatedRRuleNotifier.value = selectedRoute['rrule'];
+        List<dynamic> stops = selectedRoute['stops'];
+        routeId = selectedRoute['routeID'];
+        Provider.of<LoadingProvider>(context, listen: false)
+            .changeEditRouteLoadingState(true);
+        for (int i = 0; i < stops.length; i++) {
+          double latitude =
+              double.parse(stops[i].split(',')[0].split(':')[1].trim());
+          double longitude = double.parse(
+              stops[i].split(',')[1].split(':')[1].replaceAll('}', '').trim());
+          userAddedStops.add(LatLng(latitude, longitude));
+          String? locationName = await getPlaceName(latitude, longitude);
+          _stopNameControllers.add(
+            TextEditingController(text: locationName),
+          );
+          _stopControllers.add(
+            TextEditingController(text: stops[i]),
+          );
         }
+        Provider.of<LoadingProvider>(context, listen: false)
+            .changeEditRouteLoadingState(false);
       }
+      // }
       return true;
     } catch (e) {
       rethrow;
     }
   }
 
-  void _updateRoute() async {
+  void _saveToFirebase(User user, String tags, List<DateTime> dates,
+      String? generatedRRule, String lastEdited) async {
+    DocumentReference userRef =
+        FirebaseFirestore.instance.collection('users').doc(user.uid);
+    // Fetch the user's data
+    DocumentSnapshot<Object?> userDoc = await userRef.get();
+    List<dynamic> userRoutes = userDoc.get('routes') ?? [];
+    print('userRouts: $userRoutes');
+    // Find the index of the existing route
+    int existingRouteIndex = userRoutes
+        .indexWhere((route) => route['routeName'] == widget.routeName);
+    if (existingRouteIndex != -1) {
+      // Update the route at the existing index
+      userRoutes[existingRouteIndex] = {
+        'routeID': routeId,
+        'lastedited': DateTime.now().millisecondsSinceEpoch.toString(),
+        'routeName': _routeNameController.text,
+        'stops': _stopControllers.map((controller) => controller.text).toList(),
+        'rrule': generatedRRule,
+        'dates': dates.map((date) => date.toIso8601String()).toList(),
+        'tags': tags,
+      };
+
+      await userRef.update({'routes': userRoutes});
+
+      // showDialog(
+      //   context: context,
+      //   builder: (context) {
+      //     return AlertDialog(
+      //       title: const Text('Route Updated'),
+      //       content: const Text('Route details updated successfully.'),
+      //       actions: [
+      //         TextButton(
+      //           onPressed: () {
+      //             Navigator.of(context).pop();
+      //             Navigator.of(context).pop();
+      //           },
+      //           child: const Text('Ok'),
+      //         ),
+      //       ],
+      //     );
+      //   },
+      // );
+    }
+  }
+
+  void _updateRoute() {
     String routeName = _routeNameController.text;
     List<String> stops =
         _stopControllers.map((controller) => controller.text).toList();
@@ -120,7 +174,6 @@ class _RouteEditScreenState extends State<RouteEditScreen> {
         tags += '${tagsList[i]},';
       }
     }
-    String? generatedRRule = generatedRRuleNotifier.value;
     if (tags.trim().isEmpty) {
       showDialog(
           context: context,
@@ -165,62 +218,32 @@ class _RouteEditScreenState extends State<RouteEditScreen> {
       try {
         User? user = FirebaseAuth.instance.currentUser;
         if (user != null) {
-          DocumentReference userRef =
-              FirebaseFirestore.instance.collection('users').doc(user.uid);
+          String? generatedRRule = generatedRRuleNotifier.value;
           List<DateTime> dates = [];
-
           if (generatedRRule != null && generatedRRule.isNotEmpty) {
             RecurringDateCalculator dateCalculator =
                 RecurringDateCalculator(generatedRRule);
             dates = dateCalculator.calculateRecurringDates();
           }
-          // Fetch the user's data
-          DocumentSnapshot<Object?> userDoc = await userRef.get();
-          List<dynamic> userRoutes = userDoc.get('routes') ?? [];
-          print('userRouts: $userRoutes');
-          // Find the index of the existing route
-          int existingRouteIndex = userRoutes
-              .indexWhere((route) => route['routeName'] == widget.routeName);
-          if (existingRouteIndex != -1) {
-            // Update the route at the existing index
-            userRoutes[existingRouteIndex] = {
-              'routeID': routeId,
-              'lastedited': DateTime.now().millisecondsSinceEpoch.toString(),
-              'routeName': _routeNameController.text,
-              'stops': _stopControllers
-                  .map((controller) => controller.text)
-                  .toList(),
-              'rrule': generatedRRule,
-              'dates': dates.map((date) => date.toIso8601String()).toList(),
-              'tags': tags,
-            };
-
-            await userRef.update({'routes': userRoutes});
-
-            showDialog(
-              context: context,
-              builder: (context) {
-                return AlertDialog(
-                  title: const Text('Route Updated'),
-                  content: const Text('Route details updated successfully.'),
-                  actions: [
-                    TextButton(
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                        Navigator.of(context).pop();
-                      },
-                      child: const Text('Ok'),
-                    ),
-                  ],
-                );
-              },
-            );
-          }
+          String lastEdited = DateTime.now().millisecondsSinceEpoch.toString();
+          _saveToFirebase(user, tags, dates, generatedRRule, lastEdited);
+          Provider.of<RouteProvider>(context, listen: false)
+              .updateRoute(routeName, {
+            'routeID': routeId,
+            'lastedited': lastEdited,
+            'routeName': _routeNameController.text,
+            'stops':
+                _stopControllers.map((controller) => controller.text).toList(),
+            'rrule': generatedRRule,
+            'dates': dates.map((date) => date.toIso8601String()).toList(),
+            'tags': tags,
+          });
+          Navigator.pop(context);
         } else {
-          print('Route not found');
+          // print('Route not found');
         }
       } catch (e) {
-        print('Error updating route: $e');
+        // print('Error updating route: $e');
 
         showDialog(
           context: context,
@@ -376,16 +399,7 @@ class _RouteEditScreenState extends State<RouteEditScreen> {
           ),
         ],
       ),
-      body: FutureBuilder(
-        future: routeData,
-        builder: (BuildContext context, AsyncSnapshot<dynamic> snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
-          }
-          if (snapshot.hasData) {
-            return Padding(
+      body: Padding(
               padding: const EdgeInsets.only(
                   left: 10.0, right: 10, top: 16, bottom: 16),
               child: Column(
@@ -428,46 +442,66 @@ class _RouteEditScreenState extends State<RouteEditScreen> {
                   const SizedBox(height: 8),
                   SizedBox(
                     height: 150,
-                    child: ReorderableListView.builder(
-                      shrinkWrap: true,
-                      itemCount: _stopNameControllers.length,
-                      itemBuilder: (context, index) {
-                        return Padding(
-                          key: ValueKey(index),
-                          padding: const EdgeInsets.fromLTRB(0, 0, 0, 5),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: <Widget>[
-                              const Icon(Icons.reorder),
-                              Expanded(
-                                child: TextField(
-                                  controller: _stopNameControllers[index],
-                                  decoration: InputDecoration(
-                                    labelText: 'Stop ${index + 1}',
-                                    border: const OutlineInputBorder(),
-                                  ),
+                    child: Consumer<LoadingProvider>(
+                      builder: (BuildContext context,
+                          LoadingProvider loadingProvider, Widget? child) {
+                        return loadingProvider.editRouteLoading
+                            ? Center(
+                                child: AnimatedTextKit(
+                                  animatedTexts: [
+                                    TyperAnimatedText('Getting your stop names....'),
+                                  ],
                                 ),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.remove_circle),
-                                onPressed: () => _removeStop(index),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                      onReorder: (int oldIndex, int newIndex) {
-                        if (oldIndex < newIndex) {
-                          newIndex--;
-                        }
-                        setState(() {
-                          _stopNameControllers.insert(newIndex,
-                              _stopNameControllers.removeAt(oldIndex));
-                          _stopControllers.insert(
-                              newIndex, _stopControllers.removeAt(oldIndex));
-                          userAddedStops.insert(
-                              newIndex, userAddedStops.removeAt(oldIndex));
-                        });
+                              )
+                            : ReorderableListView.builder(
+                                shrinkWrap: true,
+                                itemCount: _stopNameControllers.length,
+                                itemBuilder: (context, index) {
+                                  return Padding(
+                                    key: ValueKey(index),
+                                    padding:
+                                        const EdgeInsets.fromLTRB(0, 0, 0, 5),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: <Widget>[
+                                        const Icon(Icons.reorder),
+                                        Expanded(
+                                          child: TextField(
+                                            controller:
+                                                _stopNameControllers[index],
+                                            decoration: InputDecoration(
+                                              labelText: 'Stop ${index + 1}',
+                                              border:
+                                                  const OutlineInputBorder(),
+                                            ),
+                                          ),
+                                        ),
+                                        if(index != 0)
+                                        IconButton(
+                                          icon: const Icon(Icons.remove_circle),
+                                          onPressed: () => _removeStop(index),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                                onReorder: (int oldIndex, int newIndex) {
+                                  if (oldIndex < newIndex) {
+                                    newIndex--;
+                                  }
+                                  setState(() {
+                                    _stopNameControllers.insert(
+                                        newIndex,
+                                        _stopNameControllers
+                                            .removeAt(oldIndex));
+                                    _stopControllers.insert(newIndex,
+                                        _stopControllers.removeAt(oldIndex));
+                                    userAddedStops.insert(newIndex,
+                                        userAddedStops.removeAt(oldIndex));
+                                  });
+                                },
+                              );
                       },
                     ),
                   ),
@@ -478,7 +512,7 @@ class _RouteEditScreenState extends State<RouteEditScreen> {
                   Expanded(
                     child: flutterMap.FlutterMap(
                       options: MapOptions(
-                        initialCenter: userAddedStops[0]!,
+                        initialCenter: userAddedStops[0],
                       ),
                       children: [
                         flutterMap.TileLayer(
@@ -545,14 +579,7 @@ class _RouteEditScreenState extends State<RouteEditScreen> {
                   ),
                 ],
               ),
-            );
-          } else {
-            return Center(
-              child: Text('${snapshot.error}'),
-            );
-          }
-        },
-      ),
+            ),
     );
   }
 }

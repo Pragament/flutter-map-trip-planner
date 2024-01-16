@@ -2,7 +2,7 @@
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:driver_app/providers/loading_provider.dart';
-import 'package:driver_app/screens/all_routes.dart';
+import 'package:driver_app/providers/route_provider.dart';
 import 'package:driver_app/widgets/tags_auto_completion.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -14,16 +14,18 @@ import 'package:location/location.dart';
 import 'package:provider/provider.dart';
 import 'package:textfield_tags/textfield_tags.dart';
 
+import '../utilities/location_functions.dart';
+
 class AddStopScreen extends StatefulWidget {
   AddStopScreen({
     super.key,
-    required this.filteredTag,
+    required this.filteredTags,
     required this.allTags,
     required this.currentLocationData,
     required this.locationName,
   });
 
-  final String? filteredTag;
+  final List<String> filteredTags;
   late List<String>? allTags;
   LocationData? currentLocationData;
   final String? locationName;
@@ -50,10 +52,9 @@ class _AddStopScreenState extends State<AddStopScreen> {
     _textfieldTagsController = TextfieldTagsController();
     _titleController = TextEditingController();
     _descriptionController = TextEditingController();
-    if (widget.filteredTag != null) {
-      displayTags.add(widget.filteredTag!);
-    }
-    locationPoint = LatLng(widget.currentLocationData!.latitude!,
+    displayTags = [...widget.filteredTags];
+    displayTags.remove('All');
+      locationPoint = LatLng(widget.currentLocationData!.latitude!,
         widget.currentLocationData!.longitude!);
     marker = marker = flutterMap.Marker(
       width: 80.0,
@@ -65,6 +66,21 @@ class _AddStopScreenState extends State<AddStopScreen> {
         size: 16,
       ),
     );
+  }
+
+  void _saveToFirebase(final newStop) async
+  {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .update({
+        'useraddedstops': FieldValue.arrayUnion([
+          newStop
+        ]),
+      });
+    }
   }
 
   String _selectedPoint = "";
@@ -82,7 +98,7 @@ class _AddStopScreenState extends State<AddStopScreen> {
         backgroundColor: Colors.amber,
         actions: [
           ElevatedButton(
-            onPressed: () async {
+            onPressed: () {
               String stop = _stopController.text.trim();
               String tag = '';
               List<String> tagsList = _textfieldTagsController.getTags!;
@@ -106,21 +122,26 @@ class _AddStopScreenState extends State<AddStopScreen> {
                   tag.isNotEmpty &&
                   commaSeparatedTags.hasMatch(tag)) {
                 try {
-                  User? user = FirebaseAuth.instance.currentUser;
-                  if (user != null) {
-                    await FirebaseFirestore.instance
-                        .collection('users')
-                        .doc(user.uid)
-                        .update({
-                      'useraddedstops': FieldValue.arrayUnion([
-                        {
-                          'stop': stop,
-                          'tags': tag,
-                          'selectedPoint': _selectedPoint,
-                        }
-                      ]),
-                    });
-                  }
+                  final newStop = {
+                    'stop': stop,
+                    'tags': tag,
+                    'selectedPoint': _selectedPoint,
+                  };
+                  double latitude = double.parse(
+                      _selectedPoint.split(',')[0].split(':')[1].trim());
+                  double longitude = double.parse(_selectedPoint
+                      .split(',')[1]
+                      .split(':')[1]
+                      .replaceAll('}', '')
+                      .trim());
+                  Provider.of<RouteProvider>(context, listen:  false).addStop(
+                      {
+                        'stop': stop,
+                        'tags': tag,
+                        'selectedPoint': LatLng(latitude, longitude),
+                      },
+                  );
+                  _saveToFirebase(newStop);
                 } catch (e) {
                   String errorMessage = e.toString();
                   showDialog(

@@ -1,5 +1,6 @@
 // ignore_for_file: use_build_context_synchronously
 
+import 'package:driver_app/providers/route_provider.dart';
 import 'package:driver_app/screens/route_add_stop.dart';
 import 'package:driver_app/widgets/tags_auto_completion.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -14,21 +15,21 @@ import 'package:rrule_generator/rrule_generator.dart';
 import 'package:flutter_osm_interface/flutter_osm_interface.dart' as osm;
 import 'package:textfield_tags/textfield_tags.dart';
 import '../providers/loading_provider.dart';
-import 'all_routes.dart';
+import '../utilities/location_functions.dart';
 import '../utilities/rrule_date_calculator.dart';
 
 class RouteCreationScreen extends StatefulWidget {
   RouteCreationScreen({
     required this.currentLocationData,
     required this.locationName,
-    required this.selectedTag,
+    required this.selectedTags,
     required this.allTags,
     super.key,
   });
 
   late LocationData? currentLocationData;
   final String? locationName;
-  final String? selectedTag;
+  final List<String> selectedTags;
   final List<String>? allTags;
 
   @override
@@ -39,7 +40,6 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
   final TextEditingController _routeNameController = TextEditingController();
   final List<TextEditingController> _stopControllers = [];
   final List<TextEditingController> _stopNameControllers = [];
-  final TextEditingController _stopNameController = TextEditingController();
   List<Map<String, dynamic>> displayedUserAddedStops = [];
   List<Map<String, dynamic>> copy = [];
   final List<FocusNode> _stopFocusNodes = [FocusNode()];
@@ -53,14 +53,14 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
   void initState() {
     super.initState();
     _textfieldTagsController = TextfieldTagsController();
-    if (widget.selectedTag != null) {
-      displayTags.add(widget.selectedTag!);
-    }
-    marker = flutterMap.Marker(
+    displayTags = [...widget.selectedTags];
+    displayTags.remove('All');
+      marker = flutterMap.Marker(
       width: 80.0,
       height: 80.0,
-      point: LatLng(widget.currentLocationData!.latitude!, widget.currentLocationData!.longitude!),
-      child:  const Icon(
+      point: LatLng(widget.currentLocationData!.latitude!,
+          widget.currentLocationData!.longitude!),
+      child: const Icon(
         Icons.circle_sharp,
         color: Colors.blue,
         size: 16,
@@ -87,14 +87,14 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
   void _removeStop(int index) {
     setState(() {
       if (index >= 0 && index < _stopControllers.length) {
-        var removedStop = _stopControllers[index].text;
-        var stopname = _stopNameController.text;
-        print(copy);
-        bool isStopInCopy = copy.any((e) => e['selectedPoint'] == removedStop);
-        if (isStopInCopy) {
-          displayedUserAddedStops
-              .add({'stop': stopname, 'selectedPoint': removedStop});
-        }
+        // var removedStop = _stopControllers[index].text;
+        // var stopname = _stopNameController.text;
+        // print(copy);
+        // bool isStopInCopy = copy.any((e) => e['selectedPoint'] == removedStop);
+        // if (isStopInCopy) {
+        //   displayedUserAddedStops
+        //       .add({'stop': stopname, 'selectedPoint': removedStop});
+        // }
         _stopNameControllers.removeAt(index);
         _stopControllers.removeAt(index);
         stops.removeAt(index);
@@ -106,16 +106,13 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
   Future<void> _fetchUserAddedStops() async {
     User? user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      DocumentSnapshot<Map<String, dynamic>> userDoc = await FirebaseFirestore
-          .instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-      List<dynamic> userAddedStopsData = userDoc.get('useraddedstops') ?? [];
+      List<dynamic> userAddedStopsData =
+          Provider.of<RouteProvider>(context, listen: false).userStops;
+      print('USER ADDED STOPS : $userAddedStopsData');
       displayedUserAddedStops = userAddedStopsData.map((stopData) {
         return {
           'stop': stopData['stop'],
-          'selectedPoint': stopData['selectedPoint']
+          'selectedPoint': stopData['selectedPoint'],
         };
       }).toList();
       copy = userAddedStopsData.map((stopData) {
@@ -125,16 +122,38 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
         };
       }).toList();
     }
+    print('DISPLAY ==> $displayedUserAddedStops');
     setState(() {
-      displayedUserAddedStops.removeWhere((element) => (element['selectedPoint'].isEmpty||element['selectedPoint'] == null));
+      displayedUserAddedStops.removeWhere((element) =>
+          (element['selectedPoint'].toString().isEmpty ||
+              element['selectedPoint'] == null));
       displayedUserAddedStops = displayedUserAddedStops;
     });
   }
 
-  void _saveRoute() async {
+  void _saveToFirebase(dynamic newRoute) async {
+    User? user = FirebaseAuth.instance.currentUser;
+
+    if (user != null) {
+      String userID = user.uid;
+      DocumentReference userRef =
+          FirebaseFirestore.instance.collection('users').doc(userID);
+
+      await userRef.update({
+        'routes': FieldValue.arrayUnion([
+            newRoute,
+        ]),
+      });
+    } else {
+      print('User is not authenticated.');
+    }
+  }
+
+  void _saveRoute() {
     String routeName = _routeNameController.text;
     List<String> stops =
         _stopControllers.map((controller) => controller.text).toList();
+    print('STOPS -$stops');
     String? generatedRRule = generatedRRuleNotifier.value;
     String tag = '';
     List<String> tagsList = _textfieldTagsController.getTags!;
@@ -149,7 +168,7 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
     }
     RegExp tagRegExp = RegExp(r'^[a-zA-Z]+(?:,[a-zA-Z]+)*$');
     if (tag.trim().isEmpty && !tagRegExp.hasMatch(tag.trim())) {
-      return showDialog(
+      showDialog(
           context: context,
           builder: (context) {
             return AlertDialog(
@@ -169,56 +188,44 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
 
     if (routeName.trim().isNotEmpty && stops.length >= 2) {
       try {
-        User? user = FirebaseAuth.instance.currentUser;
+      List<DateTime> dates = [];
 
-        if (user != null) {
-          String userID = user.uid;
-          DocumentReference userRef =
-              FirebaseFirestore.instance.collection('users').doc(userID);
+      if (generatedRRule != null && generatedRRule.isNotEmpty) {
+        RecurringDateCalculator dateCalculator =
+            RecurringDateCalculator(generatedRRule);
+        dates = dateCalculator.calculateRecurringDates();
+      }
 
-          List<DateTime> dates = [];
-
-          if (generatedRRule != null && generatedRRule.isNotEmpty) {
-            RecurringDateCalculator dateCalculator =
-                RecurringDateCalculator(generatedRRule);
-            dates = dateCalculator.calculateRecurringDates();
-          }
-
-          await userRef.update({
-            'routes': FieldValue.arrayUnion([
-              {
-                'routeID': DateTime.now().millisecondsSinceEpoch.toString(),
-                'routeName': routeName,
-                'stops': stops,
-                'rrule': generatedRRule,
-                'dates': dates.map((date) => date.toIso8601String()).toList(),
-                'tags': tag,
-              }
-            ]),
+      var newRoute = {
+        'routeID': DateTime.now().millisecondsSinceEpoch.toString(),
+        'routeName': routeName,
+        'stops': stops,
+        'rrule': generatedRRule,
+        'dates': dates.map((date) => date.toIso8601String()).toList(),
+        'tags': tag,
+      };
+      Provider.of<RouteProvider>(context, listen: false).addRoute(newRoute);
+      _saveToFirebase(newRoute);
+      showDialog(
+          context: context,
+          builder: (context) {
+            return AlertDialog(
+              title: const Text('Route added!'),
+              content: const Text('Routes saved successfully.'),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).pushNamedAndRemoveUntil(
+                        '/allroutes', (route) => false);
+                  },
+                  child: const Text('Ok'),
+                ),
+              ],
+            );
           });
-
-          showDialog(
-              context: context,
-              builder: (context) {
-                return AlertDialog(
-                  title: const Text('Route added!'),
-                  content: const Text('Routes saved successfully.'),
-                  actions: [
-                    TextButton(
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                        Navigator.of(context).pushNamedAndRemoveUntil(
-                            '/allroutes', (route) => false);
-                      },
-                      child: const Text('Ok'),
-                    ),
-                  ],
-                );
-              });
-        } else {
-          print('User is not authenticated.');
-        }
-      } catch (e) {
+      }
+      catch (e) {
         print('Error saving route: $e');
 
         showDialog(
@@ -307,18 +314,6 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
         savedRRule = rrule;
       });
     }
-  }
-
-  osm.GeoPoint parseGeoPoint(String geoPointString) {
-    RegExp regex = RegExp(r'([0-9]+\.[0-9]+)');
-    Iterable<Match> matches = regex.allMatches(geoPointString);
-
-    double latitude = double.parse(matches.elementAt(0).group(0)!);
-    double longitude = double.parse(matches.elementAt(1).group(0)!);
-    return osm.GeoPoint(
-      latitude: latitude,
-      longitude: longitude,
-    );
   }
 
   @override
@@ -446,28 +441,29 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
                                 )),
                           ),
                         ),
-                          IconButton(
-                            icon: const Icon(Icons.remove_circle),
-                            onPressed: () => _removeStop(index),
-                          ),
+                        IconButton(
+                          icon: const Icon(Icons.remove_circle),
+                          onPressed: () => _removeStop(index),
+                        ),
                       ],
                     ),
                   );
-                }, onReorder: (int oldIndex, int newIndex)
-              {
-                setState(() {
-                  if(oldIndex < newIndex)
-                  {
-                    newIndex--;
-                  }
-                  TextEditingController stopNameController = _stopNameControllers.removeAt(oldIndex);
-                  TextEditingController stopController = _stopControllers.removeAt(oldIndex);
-                  LatLng stop = stops.removeAt(oldIndex);
-                  _stopNameControllers.insert(newIndex, stopNameController);
-                  _stopControllers.insert(newIndex, stopController);
-                  stops.insert(newIndex, stop);
-                });
-              },
+                },
+                onReorder: (int oldIndex, int newIndex) {
+                  setState(() {
+                    if (oldIndex < newIndex) {
+                      newIndex--;
+                    }
+                    TextEditingController stopNameController =
+                        _stopNameControllers.removeAt(oldIndex);
+                    TextEditingController stopController =
+                        _stopControllers.removeAt(oldIndex);
+                    LatLng stop = stops.removeAt(oldIndex);
+                    _stopNameControllers.insert(newIndex, stopNameController);
+                    _stopControllers.insert(newIndex, stopController);
+                    stops.insert(newIndex, stop);
+                  });
+                },
               ),
             ),
             ElevatedButton(
@@ -477,7 +473,8 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
                   latitude: widget.currentLocationData!.latitude!,
                   longitude: widget.currentLocationData!.longitude!,
                 );
-                selectedPoint = await Navigator.push(
+                String? updatedStopName;
+                List<dynamic>  data = await Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (ctx) => RouteAddStopScreen(
@@ -486,8 +483,15 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
                     ),
                   ),
                 );
-                String? updatedStopName = await getPlaceName(
-                      selectedPoint.latitude, selectedPoint.longitude,);
+                updatedStopName = data[0]?.toString() ?? '';
+                selectedPoint = data[1] as osm.GeoPoint;
+                if(updatedStopName.trim().isEmpty)
+                  {
+                    updatedStopName = await getPlaceName(
+                      selectedPoint.latitude,
+                      selectedPoint.longitude,
+                    );
+                  }
                 String updatedStop = selectedPoint.toString();
                 setState(() {
                   _stopNameControllers
@@ -503,65 +507,66 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
             ),
             Expanded(
               child: Stack(
-                children:[ flutterMap.FlutterMap(
-                  mapController: flutterMapController,
-                  options: flutterMap.MapOptions(
-                    initialCenter: LatLng(
-                      widget.currentLocationData!.latitude!,
-                      widget.currentLocationData!.longitude!,
+                children: [
+                  flutterMap.FlutterMap(
+                    mapController: flutterMapController,
+                    options: flutterMap.MapOptions(
+                      initialCenter: LatLng(
+                        widget.currentLocationData!.latitude!,
+                        widget.currentLocationData!.longitude!,
+                      ),
+                      initialZoom: 14.0,
                     ),
-                    initialZoom: 14.0,
-                  ),
-                  children: [
-                    flutterMap.TileLayer(
-                      urlTemplate:
-                          "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-                    ),
-                    flutterMap.PolylineLayer(
-                      polylines: [
-                        flutterMap.Polyline(
-                          points: stops,
-                          strokeWidth: 4,
-                          color: Colors.blue,
-                        ),
-                      ],
-                    ),
-                    flutterMap.MarkerLayer(
-                      markers: [
-                        for (int i = 0; i < stops.length; i++)
-                          flutterMap.Marker(
-                            width: 80.0,
-                            height: 80.0,
-                            point: stops[i],
-                            child: Stack(
-                              children: [
-                                const Positioned(
-                                  top: 17.4,
-                                  left: 28,
-                                  child: Icon(
-                                    Icons.location_on,
-                                    color: Colors.black,
-                                  ),
-                                ),
-                                Positioned(
-                                  top: 27.4,
-                                  left: 25,
-                                  child: Text(
-                                    '${i + 1}',
-                                    style: const TextStyle(
+                    children: [
+                      flutterMap.TileLayer(
+                        urlTemplate:
+                            "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                      ),
+                      flutterMap.PolylineLayer(
+                        polylines: [
+                          flutterMap.Polyline(
+                            points: stops,
+                            strokeWidth: 4,
+                            color: Colors.blue,
+                          ),
+                        ],
+                      ),
+                      flutterMap.MarkerLayer(
+                        markers: [
+                          for (int i = 0; i < stops.length; i++)
+                            flutterMap.Marker(
+                              width: 80.0,
+                              height: 80.0,
+                              point: stops[i],
+                              child: Stack(
+                                children: [
+                                  const Positioned(
+                                    top: 17.4,
+                                    left: 28,
+                                    child: Icon(
+                                      Icons.location_on,
                                       color: Colors.black,
-                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                ),
-                              ],
+                                  Positioned(
+                                    top: 27.4,
+                                    left: 25,
+                                    child: Text(
+                                      '${i + 1}',
+                                      style: const TextStyle(
+                                        color: Colors.black,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                        marker,
-                      ],
-                    ),
-                  ],
-                ),
+                          marker,
+                        ],
+                      ),
+                    ],
+                  ),
                   Positioned(
                     bottom: 10,
                     right: 10,
@@ -572,16 +577,20 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
                           onPressed: () async {
                             loadingProvider
                                 .changeRouteCreationUpdateLocationState(true);
-                            widget.currentLocationData = await fetchCurrentLocation();
+                            widget.currentLocationData =
+                                await fetchCurrentLocation();
                             loadingProvider
                                 .changeRouteCreationUpdateLocationState(false);
-                            print('Updated Location  ==>  $widget.currentLocationData');
+                            print(
+                                'Updated Location  ==>  $widget.currentLocationData');
                             setState(() {
                               marker = flutterMap.Marker(
                                 width: 80.0,
                                 height: 80.0,
-                                point: LatLng(widget.currentLocationData!.latitude!, widget.currentLocationData!.longitude!),
-                                child:  const Icon(
+                                point: LatLng(
+                                    widget.currentLocationData!.latitude!,
+                                    widget.currentLocationData!.longitude!),
+                                child: const Icon(
                                   Icons.circle_sharp,
                                   color: Colors.blue,
                                   size: 16,
@@ -597,22 +606,22 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
                           },
                           child: loadingProvider.routeCreationUpdateLocation
                               ? const Center(
-                            child: SizedBox(
-                              width: 25,
-                              height: 25,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                              ),
-                            ),
-                          )
+                                  child: SizedBox(
+                                    width: 25,
+                                    height: 25,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                )
                               : const Icon(
-                            Icons.location_searching,
-                          ),
+                                  Icons.location_searching,
+                                ),
                         );
                       },
                     ),
                   ),
-              ],
+                ],
               ),
             ),
             // ValueListenableBuilder<String?>(
