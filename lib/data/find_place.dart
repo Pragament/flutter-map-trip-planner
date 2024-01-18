@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:driver_app/models/place_suggestion.dart';
-import 'package:driver_app/utilities/google_api_key.dart';
+import 'package:driver_app/utilities/env.dart';
 
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
@@ -9,11 +9,11 @@ import 'package:location/location.dart';
 import '../models/place_geo_points.dart';
 
 class FindPlace {
-
-  Future<List<Suggestion>> placeNameAutocompletion(String name, LocationData location) async {
+  Future<List<Suggestion>> placeNameAutocompletion(
+      String name, LocationData location) async {
     List<Suggestion> placeSuggestion = [];
     final url = Uri.parse(
-        'https://maps.googleapis.com/maps/api/place/autocomplete/json?input=$name&location=${location.latitude}%2C-${location.longitude}&radius=500&types=establishment&key=${GoogleApiKeys.placesApiKey}');
+        'https://maps.googleapis.com/maps/api/place/autocomplete/json?input=$name&location=${location.latitude}%2C-${location.longitude}&radius=500&types=establishment&key=${Env.GOOGLE_PLACES_API_KEY}');
     final response = await http.get(url);
 
     if (response.statusCode == 200) {
@@ -29,21 +29,19 @@ class FindPlace {
             )
             .toList();
         return placeSuggestion;
-      }
-      else if (result['status'] == 'ZERO_RESULTS') {
+      } else if (result['status'] == 'ZERO_RESULTS') {
         return [];
+      } else {
+        throw Exception(result['error_message']);
       }
-      else
-        {
-          throw Exception(result['error_message']);
-        }
     } else {
       throw Exception('Failed to fetch suggestion');
     }
   }
 
   Future<PlaceGeoPoints> fetchPlaceGeoPoints(String placeId) async {
-    final url = Uri.parse('https://maps.googleapis.com/maps/api/place/details/json?placeid=$placeId&key=${GoogleApiKeys.placesApiKey}');
+    final url = Uri.parse(
+        'https://maps.googleapis.com/maps/api/place/details/json?placeid=$placeId&key=${Env.GOOGLE_PLACES_API_KEY}');
     final response = await http.get(url);
     if (response.statusCode == 200) {
       final body = json.decode(response.body);
@@ -54,7 +52,4 @@ class FindPlace {
       throw Exception('Failed to fetch place details');
     }
   }
-
 }
-
-
