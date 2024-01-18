@@ -1,19 +1,22 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:driver_app/screens/overlay.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 
-import 'firebase_options.dart';
-import 'package:driver_app/providers/loading_provider.dart';
+import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 import 'package:permission_handler/permission_handler.dart';
+
+import 'package:driver_app/providers/filters_provider.dart';
+import 'package:driver_app/providers/route_provider.dart';
+import 'package:driver_app/providers/user_info_provider.dart';
+import 'firebase_options.dart';
+import 'package:driver_app/providers/loading_provider.dart';
+import 'package:driver_app/screens/overlay.dart';
 import 'screens/login.dart';
 import 'widgets/local_notifications.dart';
 import 'widgets/route_table.dart';
@@ -102,28 +105,31 @@ void overlayMain() {
     MaterialApp(
       debugShowCheckedModeBanner: false,
       home: Material(
-        color: Colors.yellow[200],     // teal, green, blue, deepPurple
+        color: Colors.yellow[200], // teal, green, blue, deepPurple
         child: const Column(
           mainAxisAlignment: MainAxisAlignment.start,
           children: [
-           Row(
-             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-             children: [
-               Padding(
-                 padding: EdgeInsets.only(left: 10.0),
-                 child: Text(
-                   'Next Stop :',
-                   style: TextStyle(fontSize: 19, fontWeight: FontWeight.w600),
-                 ),
-               ),
-               IconButton(
-                  onPressed: FlutterOverlayWindow.closeOverlay,
-                  icon: Icon(Icons.cancel_rounded, size: 25,),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Padding(
+                  padding: EdgeInsets.only(left: 10.0),
+                  child: Text(
+                    'Nearest Stop :',
+                    style: TextStyle(fontSize: 19, fontWeight: FontWeight.w600),
+                  ),
                 ),
-             ],
-           ),
-           Expanded(child: OverLayScreen()),
-        ],
+                IconButton(
+                  onPressed: FlutterOverlayWindow.closeOverlay,
+                  icon: Icon(
+                    Icons.cancel_rounded,
+                    size: 25,
+                  ),
+                ),
+              ],
+            ),
+            Expanded(child: OverLayScreen()),
+          ],
         ),
       ),
     ),
@@ -185,21 +191,37 @@ class _MyAppState extends State<MyApp> {
         ChangeNotifierProvider(
           create: (ctx) => LoadingProvider(),
         ),
+        ChangeNotifierProvider(
+          create: (ctx) => RouteProvider(),
+        ),
+        ChangeNotifierProvider(
+          create: (ctx) => UserInfoProvider(),
+        ),
+        ChangeNotifierProvider(
+          create: (ctx) => FiltersProvider(),
+        ),
       ],
       child: MaterialApp(
         title: 'Driver App',
         theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple,),
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: Colors.deepPurple,
+          ),
           useMaterial3: true,
         ),
         home: widget.isSignedInWithin5Days
-            ? const AllRoutesMapScreen()
+            ? AllRoutesMapScreen(
+                userRoutes: widget.routes,
+              )
             : PhoneAuthScreen(),
         debugShowCheckedModeBanner: false,
         routes: {
           '/routetable': (context) => RouteTable(routes: widget.routes),
           '/login': (context) => PhoneAuthScreen(),
-          '/allroutes': (context) => const AllRoutesMapScreen(),
+          '/allroutes': (context) => AllRoutesMapScreen(
+                userRoutes: Provider.of<RouteProvider>(context, listen: false)
+                    .userRoutes,
+              ),
         },
       ),
     );

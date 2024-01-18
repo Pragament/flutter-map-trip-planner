@@ -1,4 +1,3 @@
-
 import 'package:flutter/cupertino.dart';
 
 class LoadingProvider extends ChangeNotifier
@@ -35,4 +34,27 @@ class LoadingProvider extends ChangeNotifier
     notifyListeners();
   }
 
+  bool editRouteLoading = false;
+
+  void changeEditRouteLoadingState(bool state)
+  {
+    editRouteLoading = state;
+    notifyListeners();
+  }
+
+  bool copyRouteLoading = false;
+
+  void changeCopyRouteLoadingState(bool state)
+  {
+    copyRouteLoading = state;
+    notifyListeners();
+  }
+
+  bool allRoutesScreenFilter = false;
+
+  void changeAllRoutesScreenToggleState(bool state)
+  {
+    allRoutesScreenFilter = state;
+    notifyListeners();
+  }
 }
