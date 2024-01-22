@@ -8,6 +8,7 @@ class RouteProvider extends ChangeNotifier
   List<dynamic> userRoutes = [];
   List<Map<String, dynamic>> userStops = [];
   Map<String, List<LatLng>> routeStopsMap = {};
+  Map<String, List<String>> routeStopsNames = {};
 
   void assignRoutes(List<dynamic> routes)
   {
@@ -51,6 +52,24 @@ class RouteProvider extends ChangeNotifier
       List<LatLng> routeStops = parseGeoPoints(stops);
       routeStopsMap[route['routeName']] = routeStops;
     }
+    routeStopNames(routeStopsMap);
+    notifyListeners();
+  }
+
+  void routeStopNames(Map<String, List<LatLng>> routeStops)
+  {
+    routeStopsNames = {};
+    routeStops.entries.map((entry) {
+      List<String> stopNames = [];
+      for (int i = 0; i < entry.value.length; i++) {
+        getPlaceName(
+            entry.value[i].latitude, entry.value[i].longitude).then((value){
+          stopNames.add(value!);
+          routeStopsNames[entry.key] = stopNames;
+          notifyListeners();
+        });
+      }
+    }).toList();
     notifyListeners();
   }
 
@@ -63,6 +82,18 @@ class RouteProvider extends ChangeNotifier
   void addStop(Map<String, dynamic> stop)
   {
     userStops.add(stop);
+    notifyListeners();
+  }
+
+  void addStopAt(int index, Map<String, dynamic> stop)
+  {
+    userStops.insert(index, stop);
+    notifyListeners();
+  }
+
+  void deleteStop(int index)
+  {
+    userStops.removeAt(index);
     notifyListeners();
   }
 

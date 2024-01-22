@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:driver_app/providers/location_provider.dart';
 import 'package:driver_app/screens/route_add_stop.dart';
 import 'package:driver_app/widgets/filter_item.dart';
 import 'package:flutter/material.dart';
@@ -31,7 +32,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:firebase_storage/firebase_storage.dart' as firebase_storage;
-import 'package:flutter_osm_interface/flutter_osm_interface.dart' as geo;
+import 'package:flutter_osm_interface/flutter_osm_interface.dart' as osm;
 
 import '../utilities/location_functions.dart';
 import '../utilities/rrule_parser.dart';
@@ -48,9 +49,10 @@ class AllRoutesMapScreen extends StatefulWidget {
 class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
   late MapController flutterMapController;
 
-  LocationData? currentLocation;
+  // LocationData? currentLocation;
   String? selectedRouteId;
   String? centeredRouteId;
+
   // List<Map<String, dynamic>> filteredUserStops = [];
   List<dynamic> filteredUserRoutes = [];
   Map<String, List<LatLng>> filteredRouteStopsMap = {};
@@ -61,7 +63,8 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
   int previousIndex = 0;
   Future<List<String>>? futureList;
   String? locationName;
-  Future<bool>? getLocation;
+
+  // Future<bool>? getLocation;
   String nextStop = 'Getting your location...';
   late StreamSubscription userCurrentLocation;
   late TileLayer tileLayer;
@@ -75,12 +78,14 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
   @override
   void initState() {
     super.initState();
+    location.changeSettings(interval: 3000);
+    location.enableBackgroundMode();
     selectedTags = allTagsList;
     tileLayer = TileLayer(
       urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
     );
     flutterMapController = MapController();
-    getLocation = _fetchCurrentLocationName();
+    // getLocation = _fetchCurrentLocationName();
     isSelected.add(true);
     futureList = _fetchAllStops();
   }
@@ -91,18 +96,21 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
       String? name = await getPlaceName(item.latitude, item.longitude);
       filterStopsController.add(TextEditingController(text: name));
     }
-    print('FILTERED STOPS CONTROLLER $filterStopsController');
   }
 
-  Future<bool> _fetchCurrentLocationName() async {
+  Future<bool> _fetchCurrentLocationName(LocationData currentLocation) async {
     // Provider.of<LoadingProvider>(context, listen: false)
     //     .changeLocationLoadingState(true);
+    print('Location Updated');
+    print(DateTime.now().second);
     currentLocation = await fetchCurrentLocation() ??
         LocationData.fromMap({'latitude': 37.4219983, 'longitude': -122.084});
     locationName = await getPlaceName(
-        currentLocation!.latitude!, currentLocation!.longitude!);
+        currentLocation.latitude!, currentLocation.longitude!);
     Provider.of<LoadingProvider>(context, listen: false)
         .changeLocationLoadingState(false);
+    Provider.of<LocationProvider>(context, listen: false)
+        .updateCurrentLocation(currentLocation);
     return true;
   }
 
@@ -114,13 +122,15 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
           .collection('users')
           .doc(user.uid)
           .get();
-      Provider.of<UserInfoProvider>(context, listen: false).assignUserInfo(
-        userName: userDoc.get('name'),
-        dateOfBirth: userDoc.get('dateofbirth'),
-        phoneNumber: userDoc.get(
-          'phoneNumber',
-        ),
-      );
+      if (context.mounted) {
+        Provider.of<UserInfoProvider>(context, listen: false).assignUserInfo(
+          userName: userDoc.get('name'),
+          dateOfBirth: userDoc.get('dateofbirth'),
+          phoneNumber: userDoc.get(
+            'phoneNumber',
+          ),
+        );
+      }
       List<dynamic> userAddedStopsData = [];
       if (userDoc.get('useraddedstops').runtimeType != String) {
         userAddedStopsData = userDoc.get('useraddedstops');
@@ -148,34 +158,35 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
         return <String, String>{};
       }).toList();
       userAddedStops.removeWhere((element) => element.isEmpty);
-      Provider.of<RouteProvider>(context, listen: false)
-          .assignStops(userAddedStops);
-      // Get all tags from routes and user-added stops
-      Set<String> allTags = <String>{};
-      allTags.add('All');
-      Provider.of<RouteProvider>(context, listen: false)
-          .assignRoutes(widget.userRoutes!);
-      Provider.of<RouteProvider>(context, listen: false)
-          .routeStops(widget.userRoutes!);
-      List<dynamic>? userRoutes =
-          Provider.of<RouteProvider>(context, listen: false).userRoutes;
-      for (var route in userRoutes) {
-        List<String> tags = route['tags'].split(',');
-        allTags.addAll(tags);
-      }
+      if (context.mounted) {
+        Provider.of<RouteProvider>(context, listen: false)
+            .assignStops(userAddedStops);
+        // Get all tags from routes and user-added stops
+        Set<String> allTags = <String>{};
+        allTags.add('All');
+        Provider.of<RouteProvider>(context, listen: false)
+            .assignRoutes(widget.userRoutes!);
+        Provider.of<RouteProvider>(context, listen: false)
+            .routeStops(widget.userRoutes!);
+        List<dynamic>? userRoutes =
+            Provider.of<RouteProvider>(context, listen: false).userRoutes;
+        for (var route in userRoutes) {
+          List<String> tags = route['tags'].split(',');
+          allTags.addAll(tags);
+        }
 
-      for (var stop in userAddedStops) {
-        allTags.addAll(stop['tags'].split(','));
-      }
+        for (var stop in userAddedStops) {
+          allTags.addAll(stop['tags'].split(','));
+        }
 
-      allTagsList = allTags.toList();
-      allTagsList.removeWhere((element) => element.isEmpty);
+        allTagsList = allTags.toList();
+        allTagsList.removeWhere((element) => element.isEmpty);
 
-      for (int i = 1; i < allTagsList.length; i++) {
-        isSelected.add(false);
+        for (int i = 1; i < allTagsList.length; i++) {
+          isSelected.add(false);
+        }
       }
     }
-
     return allTagsList;
   }
 
@@ -614,6 +625,28 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
     }).toList();
   }
 
+  void removeStopFromFirebase() {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      CollectionReference collectionReference =
+          FirebaseFirestore.instance.collection('users');
+      List<Map<String, dynamic>> updatedStops = [];
+      Provider.of<RouteProvider>(context, listen: false).userStops.map((stop) {
+        Map<String, dynamic> userAddedStop = {};
+        userAddedStop['stop'] = stop['stop'];
+        userAddedStop['tags'] = stop['tags'];
+        userAddedStop['selectedPoint'] = osm.GeoPoint(
+                latitude: (stop['selectedPoint'] as LatLng).latitude,
+                longitude: (stop['selectedPoint'] as LatLng).longitude)
+            .toString();
+        updatedStops.add(userAddedStop);
+      }).toList();
+      collectionReference.doc('/${user.uid}').update({
+        'useraddedstops': updatedStops,
+      });
+    }
+  }
+
   void _filterRouteByStops(
       FiltersProvider filtersProvider, RouteProvider routeProvider) {
     filtersProvider.stopsIncluded?.map((e) => {routeProvider.routeStopsMap});
@@ -635,23 +668,19 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
         }
       }
       if (count == filtersProvider.stopsIncluded?.length) {
-        print('STOPS FILTER TRUE');
-        if(Provider.of<FiltersProvider>(context, listen: false).filterDate != null)
-          {
-            if(filteredUserRoutes.isEmpty)
-              {
-                filteredUserRoutes = [];
-                filteredRouteStopsMap = {};
-              }
-            filteredRouteStopsMap.entries.map((filteredRoute){
-              if(filteredRoute.key == routeStops.key)
-              {
-                filteredRouteStopsMap[routeStops.key] = routeStops.value;
-                filteredUserRoutes.add({routeStops.key: routeStops.value});
-              }
-            });
+        if (Provider.of<FiltersProvider>(context, listen: false).filterDate !=
+            null) {
+          if (filteredUserRoutes.isEmpty) {
+            filteredUserRoutes = [];
+            filteredRouteStopsMap = {};
           }
-        else{
+          filteredRouteStopsMap.entries.map((filteredRoute) {
+            if (filteredRoute.key == routeStops.key) {
+              filteredRouteStopsMap[routeStops.key] = routeStops.value;
+              filteredUserRoutes.add({routeStops.key: routeStops.value});
+            }
+          });
+        } else {
           filteredRouteStopsMap[routeStops.key] = routeStops.value;
           filteredUserRoutes.add({routeStops.key: routeStops.value});
         }
@@ -661,505 +690,572 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      drawer: Drawer(
-        surfaceTintColor: Colors.amber,
-        width: 250,
-        backgroundColor: Colors.amber.shade200,
-        shadowColor: Colors.cyan,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          mainAxisAlignment: MainAxisAlignment.start,
-          children: [
-            Container(
-              height: MediaQuery.of(context).size.height * 0.3,
-              color: Colors.amber,
-              child: const Center(
-                child: FlutterLogo(
-                  size: 45,
+    return StreamBuilder<LocationData>(
+        stream: location.onLocationChanged,
+        builder: (context, currentLocation) {
+          if (currentLocation.connectionState == ConnectionState.waiting) {
+            return Scaffold(
+              body: Center(
+                child: AnimatedTextKit(
+                  repeatForever: true,
+                  isRepeatingAnimation: true,
+                  animatedTexts: [
+                    TyperAnimatedText('We are getting your location ...',
+                        textStyle: const TextStyle(fontSize: 18)),
+                    TyperAnimatedText('Please wait....',
+                        textStyle: const TextStyle(fontSize: 18)),
+                    TyperAnimatedText('Sorry, for the inconvenience.',
+                        textStyle: const TextStyle(fontSize: 18)),
+                  ],
                 ),
               ),
-            ),
-            const SizedBox(height: 10),
-            Consumer<UserInfoProvider>(
-                builder: (context, userInfoProvider, child) {
-              return Text('Name: ${userInfoProvider.userName}');
-            }),
-            const SizedBox(height: 10),
-            Consumer<UserInfoProvider>(
-                builder: (context, userInfoProvider, child) {
-              return Text('Date of Birth: ${userInfoProvider.dateOfBirth}');
-            }),
-            const SizedBox(height: 10),
-            Consumer<UserInfoProvider>(
-                builder: (context, userInfoProvider, child) {
-              return Text('Phone Number: ${userInfoProvider.phoneNumber}');
-            }),
-            const Spacer(),
-            ElevatedButton.icon(
-              onPressed: _importRoute,
-              icon: const Icon(Icons.upload_file),
-              label: const Text('Import Route'),
-            ),
-            const SizedBox(height: 10),
-            ElevatedButton.icon(
-              onPressed: () async {
-                await _clearPreferences();
-                if (context.mounted) {
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(builder: (context) => PhoneAuthScreen()),
-                    (Route<dynamic> route) => false,
-                  );
-                }
-              },
-              icon: const Icon(Icons.logout_rounded),
-              label: const Text('Logout'),
-            ),
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
-      appBar: AppBar(
-        title: const Text(
-          'Driver App',
-          style: TextStyle(
-            color: Colors.white,
-          ),
-        ),
-        actions: [
-          // _buildFilterButton(),
-          // Consumer<LoadingProvider>(
-          //   builder: (BuildContext context, loadingProvider, Widget? child) {
-          //     return loadingProvider.allRoutesScreenToggle
-          //         ? InkWell(
-          //             child: const Icon(
-          //               Icons.search_rounded,
-          //               size: 28,
-          //             ),
-          //             onTap: () {},
-          //           )
-          //         : const SizedBox.shrink();
-          //   },
-          // ),
-          // const SizedBox(
-          //   width: 15,
-          // ),
-          Consumer<LoadingProvider>(builder: (context, loadingProvider, child) {
-            return IconButton(
-                onPressed: () {
-                  loadingProvider.changeAllRoutesScreenToggleState(
-                      !loadingProvider.allRoutesScreenFilter);
-                  Provider.of<FiltersProvider>(context,
-                      listen: false)
-                      .stopsIncluded = [];
-                  setState(() {
-                    stopsFilter = false;
-                  });
-                  print('STOPS FILTER $stopsFilter');
-                  Provider.of<FiltersProvider>(context,
-                      listen: false)
-                      .filterDate = null;
-                },
-                icon: const Icon(
-                  Icons.search_sharp,
-                  color: Colors.white,
-                  size: 26,
-                ),);
-          }),
-          IconButton(
-            icon: const Icon(
-              Icons.list_outlined,
-              color: Colors.white,
-              size: 26,
-            ),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const RouteTable(),
-                ),
-              );
-            },
-          ),
-        ],
-        backgroundColor: Colors.amber,
-      ),
-      body: FutureBuilder<void>(
-        future: futureList,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            );
           }
-          if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          } else {
-            LatLng? initialCenter;
-            return Consumer3<RouteProvider, FiltersProvider, LoadingProvider>(
-                builder: (context, routeProvider, filtersProvider,
-                    loadingProvider, child) {
-              filteredUserRoutes = [];
-              filteredRouteStopsMap = {};
-              bool isFiltered = true;
-
-              if (filtersProvider.filterDate != null) {
-                _filterRouteByDate(routeProvider, filtersProvider);
-                isFiltered = false;
-              }
-              if (filtersProvider.stopsIncluded!.isNotEmpty) {
-                _filterRouteByStops(filtersProvider, routeProvider);
-                isFiltered = false;
-              }
-              if (isFiltered) {
-                filteredUserRoutes = routeProvider.userRoutes;
-                filteredRouteStopsMap = routeProvider.routeStopsMap;
-              }
-              return Column(
+          _fetchCurrentLocationName(currentLocation.data!);
+          marker = Marker(
+            point: LatLng(currentLocation.data!.latitude!,
+                currentLocation.data!.longitude!),
+            child: const Icon(
+              Icons.circle_sharp,
+              color: Colors.blue,
+              size: 16,
+            ),
+          );
+          return Scaffold(
+            drawer: Drawer(
+              surfaceTintColor: Colors.amber,
+              width: 250,
+              backgroundColor: Colors.amber.shade200,
+              shadowColor: Colors.cyan,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.start,
                 children: [
-                  loadingProvider.allRoutesScreenFilter
-                      ? SizedBox(
-                          height: 200,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  FilterItem(
-                                    label: 'By Date',
-                                    onTapped: _dateFilter,
-                                  ),
-                                  const FilterItem(
-                                      label: 'By Time', onTapped: null),
-                                  const Spacer(),
-                                  IconButton(
-                                      onPressed: () {
-                                        loadingProvider
-                                            .changeAllRoutesScreenToggleState(
-                                                !loadingProvider
-                                                    .allRoutesScreenFilter);
-                                        Provider.of<FiltersProvider>(context,
-                                                listen: false)
-                                            .stopsIncluded = [];
-                                        setState(() {
-                                          stopsFilter = false;
-                                        });
-                                        print('STOPS FILTER $stopsFilter');
-                                        Provider.of<FiltersProvider>(context,
-                                                listen: false)
-                                            .filterDate = null;
-                                      },
-                                      icon: const Icon(
-                                        Icons.cancel,
-                                      )),
-                                ],
-                              ),
-                              // PopupMenuItem(
-                              //   child: const Text('Remove filters'),
-                              //   onTap: () {
-                              //     Provider.of<FiltersProvider>(context, listen: false).stopsIncluded =
-                              //     [];
-                              //     setState(() {
-                              //       stopsFilter = false;
-                              //     });
-                              //     print('STOPS FILTER $stopsFilter');
-                              //     Provider.of<FiltersProvider>(context, listen: false).filterDate =
-                              //     null;
-                              //   },
-                              // ),
-                              Expanded(
-                                child: FutureBuilder(
-                                    future: _stopsFilter(
-                                        filtersProvider.stopsIncluded),
-                                    builder: (context, snapshot) {
-                                      if (snapshot.connectionState ==
-                                          ConnectionState.waiting) {
-                                        return Center(
-                                          child: AnimatedTextKit(
-                                            animatedTexts: [
-                                              TyperAnimatedText(
-                                                  'Getting location name....'),
-                                            ],
+                  Container(
+                    height: MediaQuery.of(context).size.height * 0.3,
+                    color: Colors.amber,
+                    child: const Center(
+                      child: FlutterLogo(
+                        size: 45,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Consumer<UserInfoProvider>(
+                      builder: (context, userInfoProvider, child) {
+                    return Text('Name: ${userInfoProvider.userName}');
+                  }),
+                  const SizedBox(height: 10),
+                  Consumer<UserInfoProvider>(
+                      builder: (context, userInfoProvider, child) {
+                    return Text(
+                        'Date of Birth: ${userInfoProvider.dateOfBirth}');
+                  }),
+                  const SizedBox(height: 10),
+                  Consumer<UserInfoProvider>(
+                      builder: (context, userInfoProvider, child) {
+                    return Text(
+                        'Phone Number: ${userInfoProvider.phoneNumber}');
+                  }),
+                  const Spacer(),
+                  ElevatedButton.icon(
+                    onPressed: _importRoute,
+                    icon: const Icon(Icons.upload_file),
+                    label: const Text('Import Route'),
+                  ),
+                  const SizedBox(height: 10),
+                  ElevatedButton.icon(
+                    onPressed: () async {
+                      await _clearPreferences();
+                      if (context.mounted) {
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => PhoneAuthScreen()),
+                          (Route<dynamic> route) => false,
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.logout_rounded),
+                    label: const Text('Logout'),
+                  ),
+                  const SizedBox(height: 20),
+                ],
+              ),
+            ),
+            appBar: AppBar(
+              title: const Text(
+                'Driver App',
+                style: TextStyle(
+                  color: Colors.white,
+                ),
+              ),
+              actions: [
+                // _buildFilterButton(),
+                Consumer<LoadingProvider>(
+                    builder: (context, loadingProvider, child) {
+                  return IconButton(
+                    onPressed: () {
+                      loadingProvider.changeAllRoutesScreenToggleState(
+                          !loadingProvider.allRoutesScreenFilter);
+                      Provider.of<FiltersProvider>(context, listen: false)
+                          .stopsIncluded = [];
+                      setState(() {
+                        stopsFilter = false;
+                      });
+                      Provider.of<FiltersProvider>(context, listen: false)
+                          .filterDate = null;
+                    },
+                    icon: const Icon(
+                      Icons.search_sharp,
+                      color: Colors.white,
+                      size: 26,
+                    ),
+                  );
+                }),
+                IconButton(
+                  icon: const Icon(
+                    Icons.list_outlined,
+                    color: Colors.white,
+                    size: 26,
+                  ),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const RouteTable(),
+                      ),
+                    );
+                  },
+                ),
+              ],
+              backgroundColor: Colors.amber,
+            ),
+            body: FutureBuilder<void>(
+              future: futureList,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return Center(child: Text('Error: ${snapshot.error}'));
+                } else {
+                  LatLng? initialCenter;
+                  return Consumer3<RouteProvider, FiltersProvider,
+                          LoadingProvider>(
+                      builder: (context, routeProvider, filtersProvider,
+                          loadingProvider, child) {
+                    filteredUserRoutes = [];
+                    filteredRouteStopsMap = {};
+                    bool isFiltered = true;
+
+                    if (filtersProvider.filterDate != null) {
+                      _filterRouteByDate(routeProvider, filtersProvider);
+                      isFiltered = false;
+                    }
+                    if (filtersProvider.stopsIncluded!.isNotEmpty) {
+                      _filterRouteByStops(filtersProvider, routeProvider);
+                      isFiltered = false;
+                    }
+                    if (isFiltered) {
+                      filteredUserRoutes = routeProvider.userRoutes;
+                      filteredRouteStopsMap = routeProvider.routeStopsMap;
+                    }
+                    return Column(
+                      children: [
+                        loadingProvider.allRoutesScreenFilter
+                            ? SizedBox(
+                                height: 200,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.center,
+                                      children: [
+                                        FilterItem(
+                                          label: 'By Date',
+                                          onTapped: _dateFilter,
+                                        ),
+                                        const FilterItem(
+                                            label: 'By Time', onTapped: null),
+                                        const Spacer(),
+                                        IconButton(
+                                            onPressed: () {
+                                              loadingProvider
+                                                  .changeAllRoutesScreenToggleState(
+                                                      !loadingProvider
+                                                          .allRoutesScreenFilter);
+                                              Provider.of<FiltersProvider>(
+                                                      context,
+                                                      listen: false)
+                                                  .stopsIncluded = [];
+                                              setState(() {
+                                                stopsFilter = false;
+                                              });
+                                              Provider.of<FiltersProvider>(
+                                                      context,
+                                                      listen: false)
+                                                  .filterDate = null;
+                                            },
+                                            icon: const Icon(
+                                              Icons.cancel,
+                                            )),
+                                      ],
+                                    ),
+                                    Expanded(
+                                      child: FutureBuilder(
+                                          future: _stopsFilter(
+                                              filtersProvider.stopsIncluded),
+                                          builder: (context, snapshot) {
+                                            if (snapshot.connectionState ==
+                                                ConnectionState.waiting) {
+                                              return Center(
+                                                child: AnimatedTextKit(
+                                                  animatedTexts: [
+                                                    TyperAnimatedText(
+                                                        'Getting location name....'),
+                                                  ],
+                                                ),
+                                              );
+                                            }
+                                            return ReorderableListView.builder(
+                                              itemCount: filtersProvider
+                                                  .stopsIncluded!.length,
+                                              itemBuilder:
+                                                  (BuildContext context,
+                                                      int index) {
+                                                return Padding(
+                                                  key: ValueKey(index),
+                                                  padding:
+                                                      const EdgeInsets.only(
+                                                    top: 8.0,
+                                                    left: 10,
+                                                  ),
+                                                  child: SingleChildScrollView(
+                                                    scrollDirection:
+                                                        Axis.horizontal,
+                                                    child: SizedBox(
+                                                      width:
+                                                          MediaQuery.of(context)
+                                                              .size
+                                                              .width,
+                                                      child: Row(
+                                                        children: [
+                                                          const Icon(
+                                                              Icons.reorder),
+                                                          const SizedBox(
+                                                            width: 5,
+                                                          ),
+                                                          Expanded(
+                                                            child: TextField(
+                                                              readOnly: true,
+                                                              controller:
+                                                                  filterStopsController[
+                                                                      index],
+                                                              decoration:
+                                                                  InputDecoration(
+                                                                border:
+                                                                    const OutlineInputBorder(),
+                                                                suffixIcon:
+                                                                    IconButton(
+                                                                  onPressed:
+                                                                      () {},
+                                                                  icon: const Icon(
+                                                                      Icons
+                                                                          .gps_not_fixed),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                          const SizedBox(
+                                                            width: 2,
+                                                          ),
+                                                          IconButton(
+                                                            onPressed: () {
+                                                              filtersProvider
+                                                                  .excludeStop(
+                                                                      index);
+                                                            },
+                                                            icon: const Icon(Icons
+                                                                .remove_circle),
+                                                          ),
+                                                          const SizedBox(
+                                                            width: 10,
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                              onReorder:
+                                                  (int oldIndex, int newIndex) {
+                                                if (oldIndex < newIndex) {
+                                                  newIndex--;
+                                                }
+                                                filtersProvider.stopsIncluded!
+                                                    .insert(
+                                                        newIndex,
+                                                        filtersProvider
+                                                            .stopsIncluded!
+                                                            .removeAt(
+                                                                oldIndex));
+                                              },
+                                            );
+                                          }),
+                                    ),
+                                    ElevatedButton(
+                                      onPressed: () async {
+                                        List<dynamic> selectedStop =
+                                            await Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (ctx) =>
+                                                RouteAddStopScreen(
+                                              currentLocationData:
+                                                  currentLocation.data!,
+                                              displayedUserAddedStops:
+                                                  routeProvider.userStops,
+                                            ),
                                           ),
                                         );
+                                        filtersProvider.includedStops(
+                                            selectedStop[1] as osm.GeoPoint);
+                                      },
+                                      child: const Text('Add Stop'),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : const SizedBox.shrink(),
+                        SizedBox(
+                          height: 25,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: allTagsList.length,
+                            itemBuilder: (ctx, index) {
+                              return Row(
+                                mainAxisAlignment: MainAxisAlignment.start,
+                                children: [
+                                  Checkbox(
+                                    value: isSelected[index],
+                                    onChanged: (isChecked) {
+                                      if (isChecked!) {
+                                        if (allTagsList[index] == 'All') {
+                                          setState(() {
+                                            selectedTags = ['All'];
+                                          });
+                                        } else {
+                                          selectedTags.add(allTagsList[index]);
+                                        }
+                                        setState(() {
+                                          isSelected[index] = isChecked;
+                                        });
+                                      } else {
+                                        setState(() {
+                                          isSelected[index] = isChecked;
+                                          selectedTags
+                                              .remove(allTagsList[index]);
+                                        });
                                       }
-                                      return ReorderableListView.builder(
-                                        itemCount: filtersProvider
-                                            .stopsIncluded!.length,
-                                        itemBuilder:
-                                            (BuildContext context, int index) {
-                                          return Padding(
-                                            key: ValueKey(index),
-                                            padding: const EdgeInsets.only(
-                                              top: 8.0,
-                                              left: 10,
-                                            ),
-                                            child: SingleChildScrollView(
-                                              scrollDirection: Axis.horizontal,
-                                              child: SizedBox(
-                                                width: MediaQuery.of(context)
-                                                    .size
-                                                    .width,
-                                                child: Row(
+                                      int count = 0;
+                                      List<LatLng?> initialCenterList =
+                                          filteredRouteStopsMap.isEmpty
+                                              ? []
+                                              : selectedTags.isEmpty
+                                                  ? [
+                                                      LatLng(
+                                                          currentLocation
+                                                              .data!.latitude!,
+                                                          currentLocation
+                                                              .data!.longitude!)
+                                                    ]
+                                                  : filteredRouteStopsMap
+                                                      .entries
+                                                      .map((e) {
+                                                      if (e.key.trim() ==
+                                                          selectedTags[0]
+                                                              .trim()) {
+                                                        if (count == 0) {
+                                                          return filteredRouteStopsMap[
+                                                              e.key]?[0];
+                                                        }
+                                                        count++;
+                                                      }
+                                                    }).toList();
+                                      count = 0;
+                                      if (initialCenterList[0] != null) {
+                                        initialCenter = initialCenterList[0];
+                                        setState(() {
+                                          flutterMapController.move(
+                                              initialCenterList[0]!, 14);
+                                        });
+                                      } else {
+                                        if (routeProvider
+                                            .userStops.isNotEmpty) {
+                                          routeProvider.userStops.map((value) {
+                                            if (value['tags']
+                                                    .toString()
+                                                    .trim() ==
+                                                selectedTags[0].trim()) {
+                                              if (count == 0) {
+                                                value.entries.map((e) async {
+                                                  initialCenter =
+                                                      value['point'];
+                                                  setState(() {
+                                                    flutterMapController.move(
+                                                        initialCenter!, 14);
+                                                  });
+                                                }).toList();
+                                              }
+                                              count++;
+                                            }
+                                            count = 0;
+                                          }).toList();
+                                        }
+                                      }
+                                    },
+                                  ),
+                                  Text(allTagsList[index]),
+                                ],
+                              );
+                            },
+                          ),
+                        ),
+                        Expanded(
+                          flex: 6,
+                          child:
+                              // FutureBuilder(
+                              //                       future: getLocation,
+                              //                       builder: (context, snapshot) {
+                              //                         if (snapshot.connectionState ==
+                              //                             ConnectionState.waiting) {
+                              //                           return Center(
+                              //                             child: AnimatedTextKit(
+                              //                               repeatForever: true,
+                              //                               isRepeatingAnimation: true,
+                              //                               animatedTexts: [
+                              //                                 TyperAnimatedText(
+                              //                                     'We are getting your location ...',
+                              //                                     textStyle: const TextStyle(fontSize: 18)),
+                              //                                 TyperAnimatedText('Please wait....',
+                              //                                     textStyle: const TextStyle(fontSize: 18)),
+                              //                                 TyperAnimatedText(
+                              //                                     'Sorry, for the inconvenience.',
+                              //                                     textStyle: const TextStyle(fontSize: 18)),
+                              //                               ],
+                              //                             ),
+                              //                           );
+                              //                         }
+                              Stack(
+                            children: [
+                              Consumer<RouteProvider>(
+                                  builder: (context, routeProvider, child) {
+                                return FlutterMap(
+                                  mapController: flutterMapController,
+                                  options: MapOptions(
+                                    initialCenter: currentLocation != null
+                                        ? LatLng(
+                                            currentLocation.data!.latitude!,
+                                            currentLocation.data!.longitude!,
+                                          )
+                                        : const LatLng(9.75527985137314,
+                                            76.64998268216185),
+                                    initialZoom: 14.0,
+                                  ),
+                                  children: [
+                                    tileLayer,
+                                    for (var routeId
+                                        in routeProvider.routeStopsMap.keys)
+                                      PolylineLayer(
+                                        polylines: [
+                                          Polyline(
+                                            points: routeProvider
+                                                .routeStopsMap[routeId]!,
+                                            strokeWidth:
+                                                routeId == selectedRouteId
+                                                    ? 5
+                                                    : 3,
+                                            color: routeId == selectedRouteId
+                                                ? Colors.red
+                                                : _getRouteColor(
+                                                    routeProvider
+                                                        .routeStopsMap.keys
+                                                        .toList()
+                                                        .indexOf(routeId),
+                                                  ),
+                                          ),
+                                        ],
+                                      ),
+                                    if (routeProvider.userRoutes.isEmpty)
+                                      MarkerLayer(
+                                        markers: [
+                                          marker,
+                                        ],
+                                      ),
+                                    if (routeProvider.userRoutes.isNotEmpty)
+                                      for (var routeId
+                                          in Provider.of<RouteProvider>(context,
+                                                  listen: false)
+                                              .routeStopsMap
+                                              .keys)
+                                        MarkerLayer(
+                                          markers: routeProvider
+                                              .routeStopsMap[routeId]!
+                                              .asMap()
+                                              .entries
+                                              .map(
+                                            (entry) {
+                                              int index = entry.key;
+                                              LatLng latLng = entry.value;
+                                              return Marker(
+                                                point: latLng,
+                                                child: Stack(
                                                   children: [
-                                                    const Icon(Icons.reorder),
-                                                    const SizedBox(
-                                                      width: 5,
+                                                    const Icon(
+                                                      Icons.location_on_sharp,
                                                     ),
-                                                    Expanded(
-                                                      child: TextField(
-                                                        readOnly: true,
-                                                        controller:
-                                                            filterStopsController[
-                                                                index],
-                                                        decoration:
-                                                            InputDecoration(
-                                                          border:
-                                                              const OutlineInputBorder(),
-                                                          suffixIcon:
-                                                              IconButton(
-                                                            onPressed: () {},
-                                                            icon: const Icon(Icons
-                                                                .gps_not_fixed),
-                                                          ),
+                                                    Positioned(
+                                                      bottom: 1,
+                                                      left: 1,
+                                                      child: Text(
+                                                        '${index + 1}',
+                                                        style: TextStyle(
+                                                          color: routeId ==
+                                                                  selectedRouteId
+                                                              ? Colors.red
+                                                              : _getRouteColor(
+                                                                  routeProvider
+                                                                      .routeStopsMap
+                                                                      .keys
+                                                                      .toList()
+                                                                      .indexOf(
+                                                                        routeId,
+                                                                      ),
+                                                                ),
+                                                          fontWeight:
+                                                              FontWeight.bold,
                                                         ),
                                                       ),
                                                     ),
-                                                    const SizedBox(
-                                                      width: 2,
-                                                    ),
-                                                    IconButton(
-                                                      onPressed: () {
-                                                        filtersProvider
-                                                            .excludeStop(index);
-                                                      },
-                                                      icon: const Icon(
-                                                          Icons.remove_circle),
-                                                    ),
-                                                    const SizedBox(
-                                                      width: 10,
-                                                    ),
                                                   ],
                                                 ),
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                        onReorder:
-                                            (int oldIndex, int newIndex) {
-                                          if (oldIndex < newIndex) {
-                                            newIndex--;
-                                          }
-                                          filtersProvider.stopsIncluded!.insert(
-                                              newIndex,
-                                              filtersProvider.stopsIncluded!
-                                                  .removeAt(oldIndex));
-                                        },
-                                      );
-                                    }),
-                              ),
-                              ElevatedButton(
-                                onPressed: () async {
-                                  List<dynamic> selectedStop =
-                                      await Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (ctx) => RouteAddStopScreen(
-                                        currentLocationData: currentLocation!,
-                                        displayedUserAddedStops:
-                                            routeProvider.userStops,
-                                      ),
-                                    ),
-                                  );
-                                  filtersProvider.includedStops(
-                                      selectedStop[1] as geo.GeoPoint);
-                                },
-                                child: const Text('Add Stop'),
-                              ),
-                            ],
-                          ),
-                        )
-                      : const SizedBox.shrink(),
-                  SizedBox(
-                    height: 25,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: allTagsList.length,
-                      itemBuilder: (ctx, index) {
-                        return Row(
-                          mainAxisAlignment: MainAxisAlignment.start,
-                          children: [
-                            Checkbox(
-                              value: isSelected[index],
-                              onChanged: (isChecked) {
-                                if (isChecked!) {
-                                  if (allTagsList[index] == 'All') {
-                                    setState(() {
-                                      selectedTags = ['All'];
-                                    });
-                                  } else {
-                                    selectedTags.add(allTagsList[index]);
-                                  }
-                                  setState(() {
-                                    isSelected[index] = isChecked;
-                                  });
-                                } else {
-                                  setState(() {
-                                    isSelected[index] = isChecked;
-                                    selectedTags.remove(allTagsList[index]);
-                                  });
-                                }
-                                int count = 0;
-                                print(filteredRouteStopsMap);
-                                List<LatLng?> initialCenterList =
-                                    filteredRouteStopsMap.isEmpty
-                                        ? []
-                                        : selectedTags.isEmpty
-                                            ? [
-                                                LatLng(
-                                                    currentLocation!.latitude!,
-                                                    currentLocation!.longitude!)
-                                              ]
-                                            : filteredRouteStopsMap.entries
-                                                .map((e) {
-                                                if (e.key.trim() ==
-                                                    selectedTags[0].trim()) {
-                                                  if (count == 0) {
-                                                    return filteredRouteStopsMap[
-                                                        e.key]?[0];
-                                                  }
-                                                  count++;
-                                                }
-                                              }).toList();
-                                count = 0;
-                                if (initialCenterList[0] != null) {
-                                  initialCenter = initialCenterList[0];
-                                  setState(() {
-                                    flutterMapController.move(
-                                        initialCenterList[0]!, 14);
-                                  });
-                                } else {
-                                  if (routeProvider.userStops.isNotEmpty) {
-                                    routeProvider.userStops.map((value) {
-                                      if (value['tags'].toString().trim() ==
-                                          selectedTags[0].trim()) {
-                                        if (count == 0) {
-                                          value.entries.map((e) async {
-                                            initialCenter = value['point'];
-                                            setState(() {
-                                              flutterMapController.move(
-                                                  initialCenter!, 14);
-                                            });
-                                          }).toList();
-                                        }
-                                        count++;
-                                      }
-                                      count = 0;
-                                    }).toList();
-                                  }
-                                }
-                              },
-                            ),
-                            Text(allTagsList[index]),
-                          ],
-                        );
-                      },
-                    ),
-                  ),
-                  Expanded(
-                    flex: 6,
-                    child: FutureBuilder(
-                      future: getLocation,
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState ==
-                            ConnectionState.waiting) {
-                          return Center(
-                            child: AnimatedTextKit(
-                              repeatForever: true,
-                              isRepeatingAnimation: true,
-                              animatedTexts: [
-                                TyperAnimatedText(
-                                    'We are getting your location ...',
-                                    textStyle: const TextStyle(fontSize: 18)),
-                                TyperAnimatedText('Please wait....',
-                                    textStyle: const TextStyle(fontSize: 18)),
-                                TyperAnimatedText(
-                                    'Sorry, for the inconvenience.',
-                                    textStyle: const TextStyle(fontSize: 18)),
-                              ],
-                            ),
-                          );
-                        }
-                        marker = Marker(
-                          point: LatLng(currentLocation!.latitude!,
-                              currentLocation!.longitude!),
-                          child: const Icon(
-                            Icons.circle_sharp,
-                            color: Colors.blue,
-                            size: 16,
-                          ),
-                        );
-                        return Stack(
-                          children: [
-                            Consumer<RouteProvider>(
-                                builder: (context, routeProvider, child) {
-                              return FlutterMap(
-                                mapController: flutterMapController,
-                                options: MapOptions(
-                                  initialCenter: currentLocation != null
-                                      ? LatLng(
-                                          currentLocation!.latitude!,
-                                          currentLocation!.longitude!,
-                                        )
-                                      : const LatLng(
-                                          9.75527985137314, 76.64998268216185),
-                                  initialZoom: 14.0,
-                                ),
-                                children: [
-                                  tileLayer,
-                                  for (var routeId
-                                      in routeProvider.routeStopsMap.keys)
-                                    PolylineLayer(
-                                      polylines: [
-                                        Polyline(
-                                          points: routeProvider
-                                              .routeStopsMap[routeId]!,
-                                          strokeWidth:
-                                              routeId == selectedRouteId
-                                                  ? 5
-                                                  : 3,
-                                          color: routeId == selectedRouteId
-                                              ? Colors.red
-                                              : _getRouteColor(
-                                                  routeProvider
-                                                      .routeStopsMap.keys
-                                                      .toList()
-                                                      .indexOf(routeId),
-                                                ),
+                                              );
+                                            },
+                                          ).toList(),
                                         ),
-                                      ],
-                                    ),
-                                  if (routeProvider.userRoutes.isEmpty)
-                                    MarkerLayer(
-                                      markers: [
-                                        marker,
-                                      ],
-                                    ),
-                                  if (routeProvider.userRoutes.isNotEmpty)
-                                    for (var routeId
-                                        in Provider.of<RouteProvider>(context,
-                                                listen: false)
-                                            .routeStopsMap
-                                            .keys)
+                                    if (routeProvider.userStops.isNotEmpty)
                                       MarkerLayer(
-                                        markers: routeProvider
-                                            .routeStopsMap[routeId]!
-                                            .asMap()
-                                            .entries
-                                            .map(
-                                          (entry) {
+                                        markers: [
+                                          marker,
+                                          ...routeProvider.userStops
+                                              .asMap()
+                                              .entries
+                                              .map((entry) {
                                             int index = entry.key;
-                                            LatLng latLng = entry.value;
+                                            LatLng latLng =
+                                                entry.value['selectedPoint'];
                                             return Marker(
                                               point: latLng,
                                               child: Stack(
@@ -1172,19 +1268,8 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
                                                     left: 1,
                                                     child: Text(
                                                       '${index + 1}',
-                                                      style: TextStyle(
-                                                        color: routeId ==
-                                                                selectedRouteId
-                                                            ? Colors.red
-                                                            : _getRouteColor(
-                                                                routeProvider
-                                                                    .routeStopsMap
-                                                                    .keys
-                                                                    .toList()
-                                                                    .indexOf(
-                                                                      routeId,
-                                                                    ),
-                                                              ),
+                                                      style: const TextStyle(
+                                                        color: Colors.black,
                                                         fontWeight:
                                                             FontWeight.bold,
                                                       ),
@@ -1193,501 +1278,540 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
                                                 ],
                                               ),
                                             );
-                                          },
-                                        ).toList(),
+                                          }).toList(),
+                                        ],
                                       ),
-                                  if (routeProvider.userStops.isNotEmpty)
-                                    MarkerLayer(
-                                      markers: [
-                                        marker,
-                                        ...routeProvider.userStops
-                                            .asMap()
-                                            .entries
-                                            .map((entry) {
-                                          int index = entry.key;
-                                          LatLng latLng =
-                                              entry.value['selectedPoint'];
-                                          return Marker(
-                                            point: latLng,
-                                            child: Stack(
-                                              children: [
-                                                const Icon(
-                                                  Icons.location_on_sharp,
-                                                ),
-                                                Positioned(
-                                                  bottom: 1,
-                                                  left: 1,
-                                                  child: Text(
-                                                    '${index + 1}',
-                                                    style: const TextStyle(
-                                                      color: Colors.black,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
+                                  ],
+                                );
+                              }),
+                              Positioned(
+                                right: 15,
+                                bottom: 15,
+                                child: Consumer<LoadingProvider>(
+                                  builder: (BuildContext context,
+                                      LoadingProvider loadingProvider,
+                                      Widget? child) {
+                                    return FloatingActionButton(
+                                      onPressed: () async {
+                                        loadingProvider
+                                            .changAllRoutesUpdateLocationState(
+                                                true);
+                                        // currentLocation =
+                                        //     await fetchCurrentLocation();
+                                        loadingProvider
+                                            .changAllRoutesUpdateLocationState(
+                                                false);
+                                        setState(() {
+                                          marker = Marker(
+                                            width: 80.0,
+                                            height: 80.0,
+                                            point: LatLng(
+                                                currentLocation.data!.latitude!,
+                                                currentLocation
+                                                    .data!.longitude!),
+                                            child: const Icon(
+                                              Icons.circle_sharp,
+                                              color: Colors.blue,
+                                              size: 16,
                                             ),
                                           );
-                                        }).toList(),
-                                      ],
-                                    ),
-                                ],
-                              );
-                            }),
-                            Positioned(
-                              right: 15,
-                              bottom: 15,
-                              child: Consumer<LoadingProvider>(
-                                builder: (BuildContext context,
-                                    LoadingProvider loadingProvider,
-                                    Widget? child) {
-                                  return FloatingActionButton(
-                                    onPressed: () async {
-                                      loadingProvider
-                                          .changAllRoutesUpdateLocationState(
-                                              true);
-                                      currentLocation =
-                                          await fetchCurrentLocation();
-                                      loadingProvider
-                                          .changAllRoutesUpdateLocationState(
-                                              false);
-                                      setState(() {
-                                        marker = Marker(
-                                          width: 80.0,
-                                          height: 80.0,
-                                          point: LatLng(
-                                              currentLocation!.latitude!,
-                                              currentLocation!.longitude!),
-                                          child: const Icon(
-                                            Icons.circle_sharp,
-                                            color: Colors.blue,
-                                            size: 16,
-                                          ),
-                                        );
-                                      });
-                                      flutterMapController.move(
-                                          LatLng(
-                                            currentLocation!.latitude!,
-                                            currentLocation!.longitude!,
-                                          ),
-                                          14);
-                                      locationName = await getPlaceName(
-                                          currentLocation!.latitude!,
-                                          currentLocation!.longitude!);
-                                    },
-                                    child: loadingProvider
-                                            .allRoutesUpdateLocation
-                                        ? const Center(
-                                            child: SizedBox(
-                                              width: 25,
-                                              height: 25,
-                                              child: CircularProgressIndicator(
-                                                color: Colors.white,
-                                              ),
+                                        });
+                                        flutterMapController.move(
+                                            LatLng(
+                                              currentLocation.data!.latitude!,
+                                              currentLocation.data!.longitude!,
                                             ),
-                                          )
-                                        : const Icon(
-                                            Icons.location_searching,
-                                          ),
-                                  );
-                                },
+                                            14);
+                                        locationName = await getPlaceName(
+                                            currentLocation.data!.latitude!,
+                                            currentLocation.data!.longitude!);
+                                      },
+                                      child: loadingProvider
+                                              .allRoutesUpdateLocation
+                                          ? const Center(
+                                              child: SizedBox(
+                                                width: 25,
+                                                height: 25,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                            )
+                                          : const Icon(
+                                              Icons.location_searching,
+                                            ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (filteredRouteStopsMap.isEmpty &&
+                            routeProvider.userStops.isEmpty)
+                          const Expanded(
+                            flex: 4,
+                            child: Center(
+                              child: Text(
+                                'No routes and stops are added',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.w500, fontSize: 20),
                               ),
                             ),
-                          ],
-                        );
-                      },
-                    ),
-                  ),
-                  if (filteredRouteStopsMap.isEmpty &&
-                      routeProvider.userStops.isEmpty)
-                    const Expanded(
-                      flex: 4,
-                      child: Center(
-                        child: Text(
-                          'No routes and stops are added',
-                          style: TextStyle(
-                              fontWeight: FontWeight.w500, fontSize: 20),
-                        ),
-                      ),
-                    ),
-                  if (filteredRouteStopsMap.isNotEmpty ||
-                      routeProvider.userStops.isNotEmpty)
-                    Expanded(
-                      flex: 4,
-                      child: ListView.builder(
-                        itemCount: filteredRouteStopsMap.length +
-                            (routeProvider.userStops.length),
-                        itemBuilder: (context, index) {
-                          if (index < filteredRouteStopsMap.length) {
-                            var routeName =
-                                filteredRouteStopsMap.keys.toList()[index];
-                            var routePoints = filteredRouteStopsMap[routeName]!;
-                            var tags = '';
-                            for (var element in filteredUserRoutes) {
-                              if (element['routeName'] == routeName) {
-                                tags = element['tags'];
-                              }
-                            }
-                            bool isTagSelected = false;
-                            for (final tag in selectedTags) {
-                              if (tags.split(',').contains(tag) ||
-                                  tag == 'All') {
-                                isTagSelected = true;
-                                break;
-                              }
-                            }
-                            if (selectedTags.isEmpty) {
-                              isTagSelected = true;
-                            }
-                            if (!isTagSelected) {
-                              return const SizedBox.shrink();
-                            }
-                            LatLng? initialPoint;
-                            return ListTile(
-                              title: Row(
-                                children: [
-                                  Text(
-                                    routeName,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 5),
-                                  Text(
-                                    '(tags: $tags)',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children:
-                                    routePoints.asMap().entries.map((entry) {
-                                  int pointIndex = entry.key + 1;
-                                  LatLng point = entry.value;
-                                  if (entry.key == 0) {
-                                    initialPoint = entry.value;
+                          ),
+                        if (filteredRouteStopsMap.isNotEmpty ||
+                            routeProvider.userStops.isNotEmpty)
+                          Expanded(
+                            flex: 4,
+                            child: ListView.builder(
+                              itemCount: filteredRouteStopsMap.length +
+                                  (routeProvider.userStops.length),
+                              itemBuilder: (context, index) {
+                                if (index < filteredRouteStopsMap.length) {
+                                  var routeName = filteredRouteStopsMap.keys
+                                      .toList()[index];
+                                  var routePoints =
+                                      filteredRouteStopsMap[routeName]!;
+                                  var tags = '';
+                                  for (var element in filteredUserRoutes) {
+                                    if (element['routeName'] == routeName) {
+                                      tags = element['tags'];
+                                    }
                                   }
-                                  return FutureBuilder(
-                                      future: getPlaceName(
-                                          point.latitude, point.longitude),
-                                      builder: (context, snapshot) {
-                                        if (snapshot.connectionState ==
-                                            ConnectionState.waiting) {
-                                          return const Text('Loading..');
-                                        } else if (snapshot.hasError) {
-                                          return Text(
-                                              'Error: ${snapshot.error}');
-                                        } else {
-                                          String? placeName = snapshot.data;
-                                          return Text(
-                                              'Point $pointIndex: $placeName');
-                                        }
-                                      });
-                                }).toList(),
-                              ),
-                              onTap: () {
-                                setState(() {
-                                  selectedRouteId = routeName;
-                                  flutterMapController.move(
-                                      LatLng(initialPoint!.latitude,
-                                          initialPoint!.longitude),
-                                      14);
-                                });
-                              },
-                              trailing: PopupMenuButton<String>(
-                                elevation: 8,
-                                onSelected: (String value) {
-                                  if (value == 'edit') {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => RouteEditScreen(
-                                          routeName: routeName,
-                                          currentLocationData: currentLocation,
-                                          allTags: allTagsList,
+                                  bool isTagSelected = false;
+                                  for (final tag in selectedTags) {
+                                    if (tags.split(',').contains(tag) ||
+                                        tag == 'All') {
+                                      isTagSelected = true;
+                                      break;
+                                    }
+                                  }
+                                  if (selectedTags.isEmpty) {
+                                    isTagSelected = true;
+                                  }
+                                  if (!isTagSelected) {
+                                    return const SizedBox.shrink();
+                                  }
+                                  LatLng? initialPoint;
+                                  return ListTile(
+                                    title: Row(
+                                      children: [
+                                        Text(
+                                          routeName,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
-                                      ),
-                                    );
-                                    // Implement edit functionality
-                                  } else if (value == 'duplicate') {
-                                    // Implement copy functionality
-
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => RouteCopyScreen(
-                                          routeName: routeName,
+                                        const SizedBox(width: 5),
+                                        Text(
+                                          '(tags: $tags)',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
-                                      ),
-                                    );
-                                  } else if (value == 'delete') {
-                                    // print('Oops!, lets delete this.');
-                                    // Implement delete functionality
-                                    showDialog(
-                                      context: context,
-                                      builder: (context) {
-                                        return AlertDialog(
-                                          title: const Text('Confirm Deletion'),
-                                          content: Text(
-                                              'Your route $routeName will be deleted. Do you want to continue?'),
-                                          actions: [
-                                            TextButton(
-                                              onPressed: () {
-                                                Navigator.of(context)
-                                                    .pop(); // Close the dialog
-                                              },
-                                              child: const Text('Cancel'),
+                                      ],
+                                    ),
+                                    subtitle: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        if (routeProvider.routeStopsNames[
+                                                    routeName] ==
+                                                null ||
+                                            routeProvider
+                                                .routeStopsNames[routeName]!
+                                                .isEmpty)
+                                          const Text(
+                                            'Loading...',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w500,
                                             ),
-                                            TextButton(
-                                              onPressed: () {
-                                                Provider.of<RouteProvider>(
-                                                  context,
-                                                  listen: false,
-                                                ).deleteRoute(routeName);
-                                                _deleteRoute(
-                                                    routeName: routeName);
-                                                Navigator.of(context).pop();
+                                          ),
+                                        if (routeProvider
+                                                .routeStopsNames[routeName] !=
+                                            null)
+                                          for (int stop = 0;
+                                              stop <
+                                                  routeProvider
+                                                      .routeStopsNames[
+                                                          routeName]!
+                                                      .length;
+                                              stop++)
+                                            Text(
+                                              'Point ${stop + 1} : ${routeProvider.routeStopsNames[routeName]![stop]}',
+                                            ),
+                                      ],
+                                    ),
+                                    onTap: () {
+                                      initialPoint = routePoints[0];
+                                      setState(() {
+                                        selectedRouteId = routeName;
+                                        flutterMapController.move(
+                                            LatLng(initialPoint!.latitude,
+                                                initialPoint!.longitude),
+                                            14);
+                                      });
+                                    },
+                                    trailing: PopupMenuButton<String>(
+                                      elevation: 8,
+                                      onSelected: (String value) async {
+                                        if (value == 'edit') {
+                                          await Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) =>
+                                                  RouteEditScreen(
+                                                routeName: routeName,
+                                                currentLocationData:
+                                                    currentLocation.data!,
+                                                allTags: allTagsList,
+                                              ),
+                                            ),
+                                          );
+                                        } else if (value == 'duplicate') {
+                                          // Implement copy functionality
+
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) =>
+                                                  RouteCopyScreen(
+                                                routeName: routeName,
+                                              ),
+                                            ),
+                                          );
+                                        } else if (value == 'delete') {
+                                          // print('Oops!, lets delete this.');
+                                          // Implement delete functionality
+                                          showDialog(
+                                            context: context,
+                                            builder: (context) {
+                                              return AlertDialog(
+                                                title: const Text(
+                                                    'Confirm Deletion'),
+                                                content: Text(
+                                                    'Your route $routeName will be deleted. Do you want to continue?'),
+                                                actions: [
+                                                  TextButton(
+                                                    onPressed: () {
+                                                      Navigator.of(context)
+                                                          .pop(); // Close the dialog
+                                                    },
+                                                    child: const Text('Cancel'),
+                                                  ),
+                                                  TextButton(
+                                                    onPressed: () {
+                                                      Provider.of<
+                                                          RouteProvider>(
+                                                        context,
+                                                        listen: false,
+                                                      ).deleteRoute(routeName);
+                                                      _deleteRoute(
+                                                          routeName: routeName);
+                                                      Navigator.of(context)
+                                                          .pop();
+                                                    },
+                                                    child: const Text('Delete'),
+                                                  ),
+                                                ],
+                                              );
+                                            },
+                                          );
+                                        } else if (value == 'navigate') {
+                                          // print('lets navigate! ohoo');
+                                        } else if (value == 'share') {
+                                          // print('lets share it');
+                                          encodeAndShareRoute(routeName);
+                                        }
+                                      },
+                                      itemBuilder: (BuildContext context) =>
+                                          <PopupMenuEntry<String>>[
+                                        const PopupMenuItem<String>(
+                                          value: 'edit',
+                                          child: ListTile(
+                                            leading: Icon(Icons.edit),
+                                            title: Text('Edit'),
+                                          ),
+                                        ),
+                                        const PopupMenuItem<String>(
+                                          value: 'duplicate',
+                                          child: ListTile(
+                                            leading: Icon(Icons.copy),
+                                            title: Text('duplicate'),
+                                          ),
+                                        ),
+                                        const PopupMenuItem<String>(
+                                          value: 'delete',
+                                          child: ListTile(
+                                            leading: Icon(Icons.delete),
+                                            title: Text('Delete'),
+                                          ),
+                                        ),
+                                        PopupMenuItem(
+                                          value: 'navigate',
+                                          child: ListTile(
+                                            leading: const Icon(
+                                                Icons.navigation_rounded),
+                                            title: const Text('Navigate'),
+                                            onTap: () async {
+                                              List<LatLng> stops =
+                                                  filteredRouteStopsMap[
+                                                      routeName]!;
+                                              _startNavigation(stops);
+                                              // locationStreamSubscription =
+                                              //     location.onLocationChanged
+                                              //         .listen((event) {});
+                                              nextStop = 'Getting Location ...';
+                                              stop = 0;
+                                              FlutterOverlayWindow.showOverlay(
+                                                  height: 350, // 350
+                                                  width: 900,
+                                                  enableDrag: true);
+                                              await FlutterOverlayWindow
+                                                  .shareData(
+                                                      'Getting Location ...');
+                                              await getNextStop(stops);
+                                            },
+                                          ),
+                                        ),
+                                        const PopupMenuItem(
+                                          value: 'share',
+                                          child: ListTile(
+                                            leading: Icon(Icons.share),
+                                            title: Text('Share'),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    selected: selectedRouteId == routeName,
+                                    tileColor: selectedRouteId == routeName
+                                        ? Colors.grey
+                                        : null,
+                                  );
+                                } else {
+                                  // For user-added stops
+                                  if (routeProvider.userStops.isNotEmpty) {
+                                    var userStop = routeProvider.userStops[
+                                        index - filteredUserRoutes.length];
+                                    var tags = userStop['tags'].split(',');
+                                    bool isTagSelected = false;
+                                    for (final tag in selectedTags) {
+                                      if (tags.contains(tag) || tag == 'All') {
+                                        isTagSelected = true;
+                                        break;
+                                      }
+                                    }
+                                    if (selectedTags.isEmpty) {
+                                      isTagSelected = true;
+                                    }
+                                    if (!isTagSelected) {
+                                      return const SizedBox.shrink();
+                                    }
+                                    return ListTile(
+                                      title: Text(
+                                        userStop['stop'],
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      subtitle: Text(
+                                        'Tags: ${userStop['tags']}',
+                                      ),
+                                      onTap: () {
+                                        setState(() {
+                                          flutterMapController.move(
+                                              routeProvider.userStops[index -
+                                                      filteredUserRoutes.length]
+                                                  ['point'],
+                                              14);
+                                          centeredRouteId = null;
+                                        });
+                                      },
+                                      trailing: PopupMenuButton(
+                                        itemBuilder: (BuildContext context) {
+                                          return [
+                                            PopupMenuItem(
+                                              onTap: () async {
+                                                List<String> stopTags =
+                                                    (userStop['tags'] as String)
+                                                        .split(',');
+                                                await Navigator.of(context)
+                                                    .push(
+                                                  MaterialPageRoute(
+                                                    builder: (ctx) =>
+                                                        AddStopScreen(
+                                                      filteredTags: stopTags,
+                                                      allTags: allTagsList,
+                                                      currentLocationData:
+                                                          LocationData.fromMap({
+                                                        'latitude': userStop[
+                                                                'selectedPoint']
+                                                            .latitude,
+                                                        'longitude': userStop[
+                                                                'selectedPoint']
+                                                            .longitude,
+                                                      }),
+                                                      locationName:
+                                                          userStop['stop'],
+                                                      isEdit: true,
+                                                      index: index -
+                                                          filteredUserRoutes
+                                                              .length,
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                              child: const Text('Edit'),
+                                            ),
+                                            PopupMenuItem(
+                                              onTap: () {
+                                                routeProvider.deleteStop(index -
+                                                    filteredUserRoutes.length);
+                                                removeStopFromFirebase();
                                               },
                                               child: const Text('Delete'),
                                             ),
-                                          ],
-                                        );
-                                      },
+                                            PopupMenuItem(
+                                              onTap: () {
+                                                List<LatLng> stops = [
+                                                  LatLng(
+                                                      currentLocation
+                                                          .data!.latitude!,
+                                                      currentLocation
+                                                          .data!.longitude!),
+                                                  userStop['selectedPoint']
+                                                ];
+                                                _startNavigation(stops);
+                                              },
+                                              child: const Text('Navigate'),
+                                            ),
+                                          ];
+                                        },
+                                      ),
                                     );
-                                  } else if (value == 'navigate') {
-                                    // print('lets navigate! ohoo');
-                                  } else if (value == 'share') {
-                                    // print('lets share it');
-                                    encodeAndShareRoute(routeName);
+                                  } else {
+                                    return const ListTile(
+                                      title:
+                                          Text('No user-added stops available'),
+                                    );
                                   }
-                                },
-                                itemBuilder: (BuildContext context) =>
-                                    <PopupMenuEntry<String>>[
-                                  const PopupMenuItem<String>(
-                                    value: 'edit',
-                                    child: ListTile(
-                                      leading: Icon(Icons.edit),
-                                      title: Text('Edit'),
-                                    ),
-                                  ),
-                                  const PopupMenuItem<String>(
-                                    value: 'duplicate',
-                                    child: ListTile(
-                                      leading: Icon(Icons.copy),
-                                      title: Text('duplicate'),
-                                    ),
-                                  ),
-                                  const PopupMenuItem<String>(
-                                    value: 'delete',
-                                    child: ListTile(
-                                      leading: Icon(Icons.delete),
-                                      title: Text('Delete'),
-                                    ),
-                                  ),
-                                  PopupMenuItem(
-                                    value: 'navigate',
-                                    child: ListTile(
-                                      leading:
-                                          const Icon(Icons.navigation_rounded),
-                                      title: const Text('Navigate'),
-                                      onTap: () async {
-                                        List<LatLng> stops =
-                                            filteredRouteStopsMap[routeName]!;
-                                        _startNavigation(stops);
-                                        locationStreamSubscription = location
-                                            .onLocationChanged
-                                            .listen((event) {});
-                                        nextStop = 'Getting Location ...';
-                                        stop = 0;
-                                        FlutterOverlayWindow.showOverlay(
-                                            height: 350, // 350
-                                            width: 900,
-                                            enableDrag: true);
-                                        await FlutterOverlayWindow.shareData(
-                                            'Getting Location ...');
-                                        await getNextStop(stops);
-                                      },
-                                    ),
-                                  ),
-                                  const PopupMenuItem(
-                                    value: 'share',
-                                    child: ListTile(
-                                      leading: Icon(Icons.share),
-                                      title: Text('Share'),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              selected: selectedRouteId == routeName,
-                              tileColor: selectedRouteId == routeName
-                                  ? Colors.grey
-                                  : null,
-                            );
-                          } else {
-                            // For user-added stops
-                            if (routeProvider.userStops.isNotEmpty) {
-                              var userStop = routeProvider.userStops[
-                                  index - filteredRouteStopsMap.length];
-                              var tags = userStop['tags'].split(',');
-                              bool isTagSelected = false;
-                              for (final tag in selectedTags) {
-                                if (tags.contains(tag) || tag == 'All') {
-                                  isTagSelected = true;
-                                  break;
                                 }
-                              }
-                              if (selectedTags.isEmpty) {
-                                isTagSelected = true;
-                              }
-                              if (!isTagSelected) {
-                                return const SizedBox.shrink();
-                              }
-                              return ListTile(
-                                title: Text(
-                                  userStop['stop'],
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
+                              },
+                            ),
+                          ),
+                      ],
+                    );
+                  });
+                }
+              },
+            ),
+            floatingActionButton: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Consumer<LoadingProvider>(
+                  builder: (BuildContext context, value, Widget? child) {
+                    return FloatingActionButton(
+                      heroTag: null,
+                      backgroundColor: Colors.amber,
+                      onPressed: value.locationLoading
+                          ? () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: const Text(
+                                    'Getting your location',
                                   ),
+                                  action: SnackBarAction(
+                                      label: 'Ok',
+                                      onPressed: ScaffoldMessenger.of(context)
+                                          .clearSnackBars),
                                 ),
-                                subtitle: Text(
-                                  'Tags: ${userStop['tags']}',
-                                ),
-                                onTap: () {
-                                  setState(() {
-                                    flutterMapController.move(
-                                        routeProvider.userStops[index -
-                                                filteredRouteStopsMap.length]
-                                            ['point'],
-                                        14);
-                                    centeredRouteId = null;
-                                  });
-                                },
-                                trailing: const Text('added stops'),
-                              );
-                            } else {
-                              return const ListTile(
-                                title: Text('No user-added stops available'),
                               );
                             }
-                          }
-                        },
-                      ),
-                    ),
-                ],
-              );
-            });
-          }
-        },
-      ),
-      floatingActionButton: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          Consumer<LoadingProvider>(
-            builder: (BuildContext context, value, Widget? child) {
-              return FloatingActionButton(
-                heroTag: null,
-                backgroundColor: Colors.amber,
-                onPressed: value.locationLoading
-                    ? () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Text(
-                              'Getting your location',
+                          : () async {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => RouteCreationScreen(
+                                    selectedTags: selectedTags,
+                                    locationName: locationName,
+                                    currentLocationData: currentLocation.data!,
+                                    allTags: allTagsList,
+                                  ),
+                                ),
+                              );
+                            },
+                      child: value.locationLoading
+                          ? const Center(
+                              child: SizedBox(
+                                width: 25,
+                                height: 25,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                ),
+                              ),
+                            )
+                          : const Icon(
+                              Icons.add_road_sharp,
+                              color: Colors.white,
                             ),
-                            action: SnackBarAction(
-                                label: 'Ok',
-                                onPressed: ScaffoldMessenger.of(context)
-                                    .clearSnackBars),
-                          ),
-                        );
-                      }
-                    : () async {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => RouteCreationScreen(
-                              selectedTags: selectedTags,
-                              locationName: locationName,
-                              currentLocationData: currentLocation,
-                              allTags: allTagsList,
+                    );
+                  },
+                ),
+                const SizedBox(width: 16),
+                Consumer<LoadingProvider>(
+                  builder: (BuildContext context, LoadingProvider value,
+                      Widget? child) {
+                    return FloatingActionButton(
+                      heroTag: null,
+                      onPressed: value.locationLoading
+                          ? () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: const Text(
+                                    'Getting your location',
+                                  ),
+                                  action: SnackBarAction(
+                                      label: 'Ok',
+                                      onPressed: ScaffoldMessenger.of(context)
+                                          .clearSnackBars),
+                                ),
+                              );
+                            }
+                          : () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => AddStopScreen(
+                                    filteredTags: selectedTags,
+                                    allTags: allTagsList,
+                                    currentLocationData: currentLocation.data!,
+                                    locationName: locationName,
+                                  ),
+                                ),
+                              );
+                            },
+                      backgroundColor: Colors.amber,
+                      child: value.locationLoading
+                          ? const Center(
+                              child: SizedBox(
+                                width: 25,
+                                height: 25,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                ),
+                              ),
+                            )
+                          : const Icon(
+                              Icons.add_location_alt_outlined,
+                              color: Colors.white,
                             ),
-                          ),
-                        );
-                      },
-                child: value.locationLoading
-                    ? const Center(
-                        child: SizedBox(
-                          width: 25,
-                          height: 25,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                          ),
-                        ),
-                      )
-                    : const Icon(
-                        Icons.add_road_sharp,
-                        color: Colors.white,
-                      ),
-              );
-            },
-          ),
-          const SizedBox(width: 16),
-          Consumer<LoadingProvider>(
-            builder:
-                (BuildContext context, LoadingProvider value, Widget? child) {
-              return FloatingActionButton(
-                heroTag: null,
-                onPressed: value.locationLoading
-                    ? () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Text(
-                              'Getting your location',
-                            ),
-                            action: SnackBarAction(
-                                label: 'Ok',
-                                onPressed: ScaffoldMessenger.of(context)
-                                    .clearSnackBars),
-                          ),
-                        );
-                      }
-                    : () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => AddStopScreen(
-                              filteredTags: selectedTags,
-                              allTags: allTagsList,
-                              currentLocationData: currentLocation,
-                              locationName: locationName,
-                            ),
-                          ),
-                        );
-                      },
-                backgroundColor: Colors.amber,
-                child: value.locationLoading
-                    ? const Center(
-                        child: SizedBox(
-                          width: 25,
-                          height: 25,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                          ),
-                        ),
-                      )
-                    : const Icon(
-                        Icons.add_location_alt_outlined,
-                        color: Colors.white,
-                      ),
-              );
-            },
-          )
-        ],
-      ),
-    );
+                    );
+                  },
+                )
+              ],
+            ),
+          );
+        });
   }
 }

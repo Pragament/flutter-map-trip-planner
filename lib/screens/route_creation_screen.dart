@@ -87,14 +87,6 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
   void _removeStop(int index) {
     setState(() {
       if (index >= 0 && index < _stopControllers.length) {
-        // var removedStop = _stopControllers[index].text;
-        // var stopname = _stopNameController.text;
-        // print(copy);
-        // bool isStopInCopy = copy.any((e) => e['selectedPoint'] == removedStop);
-        // if (isStopInCopy) {
-        //   displayedUserAddedStops
-        //       .add({'stop': stopname, 'selectedPoint': removedStop});
-        // }
         _stopNameControllers.removeAt(index);
         _stopControllers.removeAt(index);
         stops.removeAt(index);
@@ -122,7 +114,6 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
         };
       }).toList();
     }
-    print('DISPLAY ==> $displayedUserAddedStops');
     setState(() {
       displayedUserAddedStops.removeWhere((element) =>
           (element['selectedPoint'].toString().isEmpty ||
@@ -166,8 +157,9 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
         tag += '${tagsList[i]},';
       }
     }
-    RegExp tagRegExp = RegExp(r'^[a-zA-Z]+(?:,[a-zA-Z]+)*$');
-    if (tag.trim().isEmpty && !tagRegExp.hasMatch(tag.trim())) {
+    // RegExp tagRegExp = RegExp(r'^[a-zA-Z]+(?:,[a-zA-Z]+)*$');
+    // && !tagRegExp.hasMatch(tag.trim())
+    if (tag.trim().isEmpty ) {
       showDialog(
           context: context,
           builder: (context) {
