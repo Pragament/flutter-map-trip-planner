@@ -70,7 +70,7 @@ class TagsAutoCompletion extends StatelessWidget {
           focusNode: tfn,
           textfieldTagsController: textfieldTagsController,
           initialTags: displayTags,
-          textSeparators: const [' ', ','],
+          textSeparators: const [','],
           letterCase: LetterCase.normal,
           validator: (String tag) {
             if (textfieldTagsController.getTags!.contains(tag)) {

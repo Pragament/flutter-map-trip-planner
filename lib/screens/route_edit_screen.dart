@@ -238,7 +238,8 @@ class _RouteEditScreenState extends State<RouteEditScreen> {
             'dates': dates.map((date) => date.toIso8601String()).toList(),
             'tags': tags,
           });
-          Navigator.pop(context);
+
+          Navigator.pop(context, true);
         } else {
           // print('Route not found');
         }

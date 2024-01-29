@@ -23,12 +23,16 @@ class AddStopScreen extends StatefulWidget {
     required this.allTags,
     required this.currentLocationData,
     required this.locationName,
+    this.isEdit,
+    this.index,
   });
 
   final List<String> filteredTags;
   late List<String>? allTags;
   LocationData? currentLocationData;
   final String? locationName;
+  bool? isEdit = false;
+  int? index;
 
   @override
   State<AddStopScreen> createState() => _AddStopScreenState();
@@ -47,6 +51,11 @@ class _AddStopScreenState extends State<AddStopScreen> {
   void initState() {
     // TODO: implement initState
     super.initState();
+    _selectedPoint = osm.GeoPoint(
+            latitude: widget.currentLocationData!.latitude!,
+            longitude: widget.currentLocationData!.longitude!)
+        .toString();
+    print(_selectedPoint);
     flutterMapController = flutterMap.MapController();
     _stopController = TextEditingController(text: widget.locationName);
     _textfieldTagsController = TextfieldTagsController();
@@ -54,13 +63,14 @@ class _AddStopScreenState extends State<AddStopScreen> {
     _descriptionController = TextEditingController();
     displayTags = [...widget.filteredTags];
     displayTags.remove('All');
-      locationPoint = LatLng(widget.currentLocationData!.latitude!,
+    locationPoint = LatLng(widget.currentLocationData!.latitude!,
         widget.currentLocationData!.longitude!);
     marker = marker = flutterMap.Marker(
       width: 80.0,
       height: 80.0,
-      point: LatLng(widget.currentLocationData!.latitude!, widget.currentLocationData!.longitude!),
-      child:  const Icon(
+      point: LatLng(widget.currentLocationData!.latitude!,
+          widget.currentLocationData!.longitude!),
+      child: const Icon(
         Icons.circle_sharp,
         color: Colors.blue,
         size: 16,
@@ -68,18 +78,35 @@ class _AddStopScreenState extends State<AddStopScreen> {
     );
   }
 
-  void _saveToFirebase(final newStop) async
-  {
+  void _saveToFirebase(final newStop) async {
     User? user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .update({
-        'useraddedstops': FieldValue.arrayUnion([
-          newStop
-        ]),
-      });
+      if (widget.isEdit != null && !widget.isEdit!) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .update({
+          'useraddedstops': FieldValue.arrayUnion([newStop]),
+        });
+      } else {
+        CollectionReference collectionReference =
+            FirebaseFirestore.instance.collection('users');
+        List<Map<String, dynamic>> updatedStops = [];
+        Provider.of<RouteProvider>(context, listen: false).userStops.map((stop) {
+          Map<String, dynamic> userAddedStop = {};
+          userAddedStop['stop'] = stop['stop'];
+          userAddedStop['tags'] = stop['tags'];
+          userAddedStop['selectedPoint'] = osm.GeoPoint(
+              latitude: (stop['selectedPoint'] as LatLng).latitude,
+              longitude: (stop['selectedPoint'] as LatLng).longitude)
+              .toString();
+          updatedStops.add(userAddedStop);
+        }).toList();
+        collectionReference.doc('/${user.uid}').update({
+          'useraddedstops':
+          updatedStops,
+        });
+      }
     }
   }
 
@@ -111,16 +138,15 @@ class _AddStopScreenState extends State<AddStopScreen> {
                   tag += '${tagsList[i]},';
                 }
               }
-              RegExp commaSeparatedTags = RegExp(r'^[a-zA-Z]+(?:,[a-zA-Z]+)*$');
+              // RegExp commaSeparatedTags = RegExp(r'^[a-zA-Z]+(?:,[a-zA-Z]+)*$');
               print(_stopController.text);
               print(_textfieldTagsController.getTags);
               print(tag);
               print(_selectedPoint);
-              print(commaSeparatedTags.hasMatch(tag));
+              // print(commaSeparatedTags.hasMatch(tag));
 
               if (_stopController.text.isNotEmpty &&
-                  tag.isNotEmpty &&
-                  commaSeparatedTags.hasMatch(tag)) {
+                  tag.isNotEmpty) {
                 try {
                   final newStop = {
                     'stop': stop,
@@ -134,13 +160,27 @@ class _AddStopScreenState extends State<AddStopScreen> {
                       .split(':')[1]
                       .replaceAll('}', '')
                       .trim());
-                  Provider.of<RouteProvider>(context, listen:  false).addStop(
+                  if (widget.index != null && widget.isEdit!) {
+                    Provider.of<RouteProvider>(context, listen: false)
+                        .deleteStop(widget.index!);
+                    Provider.of<RouteProvider>(context, listen: false)
+                        .addStopAt(
+                      widget.index!,
                       {
                         'stop': stop,
                         'tags': tag,
                         'selectedPoint': LatLng(latitude, longitude),
                       },
-                  );
+                    );
+                  } else {
+                    Provider.of<RouteProvider>(context, listen: false).addStop(
+                      {
+                        'stop': stop,
+                        'tags': tag,
+                        'selectedPoint': LatLng(latitude, longitude),
+                      },
+                    );
+                  }
                   _saveToFirebase(newStop);
                 } catch (e) {
                   String errorMessage = e.toString();
@@ -168,9 +208,10 @@ class _AddStopScreenState extends State<AddStopScreen> {
 
                 if (tag.isEmpty) {
                   errorMessage = 'Tags are required.';
-                } else if (!commaSeparatedTags.hasMatch(tag)) {
-                  errorMessage = 'Tags must be separated by commas.';
                 }
+                // else if (!commaSeparatedTags.hasMatch(tag)) {
+                //   errorMessage = 'Tags must be separated by commas.';
+                // }
 
                 // Show a dialog or a message to inform the user of the error.
                 showDialog(
@@ -212,13 +253,15 @@ class _AddStopScreenState extends State<AddStopScreen> {
                 hintText: 'wanna select from map? Click here 👉🏻',
                 suffixIcon: GestureDetector(
                   onTap: () async {
-                    osm.GeoPoint selectedLocation = locationPoint != null ? osm.GeoPoint(
-                      latitude: locationPoint!.latitude,
-                      longitude: locationPoint!.longitude,
-                    ) : osm.GeoPoint(
-                      latitude: widget.currentLocationData!.latitude!,
-                      longitude: widget.currentLocationData!.longitude!,
-                    );
+                    osm.GeoPoint selectedLocation = locationPoint != null
+                        ? osm.GeoPoint(
+                            latitude: locationPoint!.latitude,
+                            longitude: locationPoint!.longitude,
+                          )
+                        : osm.GeoPoint(
+                            latitude: widget.currentLocationData!.latitude!,
+                            longitude: widget.currentLocationData!.longitude!,
+                          );
                     final selectedPoint = await showSimplePickerLocation(
                       context: context,
                       isDismissible: true,
@@ -315,10 +358,12 @@ class _AddStopScreenState extends State<AddStopScreen> {
                           onPressed: () async {
                             loadingProvider
                                 .changeAddStopsUpdateLocationState(true);
-                            widget.currentLocationData = await fetchCurrentLocation();
+                            widget.currentLocationData =
+                                await fetchCurrentLocation();
                             loadingProvider
                                 .changeAddStopsUpdateLocationState(false);
-                            print('Updated Location  ==>  ${widget.currentLocationData}');
+                            print(
+                                'Updated Location  ==>  ${widget.currentLocationData}');
                             flutterMapController.move(
                                 LatLng(
                                   widget.currentLocationData!.latitude!,
@@ -329,8 +374,10 @@ class _AddStopScreenState extends State<AddStopScreen> {
                               marker = marker = flutterMap.Marker(
                                 width: 80.0,
                                 height: 80.0,
-                                point: LatLng(widget.currentLocationData!.latitude!, widget.currentLocationData!.longitude!),
-                                child:  const Icon(
+                                point: LatLng(
+                                    widget.currentLocationData!.latitude!,
+                                    widget.currentLocationData!.longitude!),
+                                child: const Icon(
                                   Icons.circle_sharp,
                                   color: Colors.blue,
                                   size: 16,
