@@ -55,7 +55,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyA5Uk4f9UDhF0ri9qQjNb5-F_-H7iGxn1k',
-    appId: '1:117481681716:android:d07d69e794a4f191fbab61',
+    appId: '1:117481681716:android:d732df70dea61ffcfbab61',
     messagingSenderId: '117481681716',
     projectId: 'driver-map-planner-dev',
     storageBucket: 'driver-map-planner-dev.appspot.com',
