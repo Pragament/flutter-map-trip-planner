@@ -74,11 +74,8 @@ class _RouteEditScreenState extends State<RouteEditScreen> {
       //     .doc(user.uid)
       //     .get();
       // List<dynamic> userRoutes = userDoc.get('routes') ?? [];
-      List<dynamic> userRoutes =
-          Provider.of<RouteProvider>(context, listen: false).userRoutes;
-      var selectedRoute = userRoutes.firstWhere(
-          (route) => route['routeName'] == widget.routeName,
-          orElse: () => null);
+      List<dynamic> userRoutes = Provider.of<RouteProvider>(context, listen: false).userRoutes;
+      var selectedRoute = userRoutes.firstWhere((route) => route['routeName'] == widget.routeName, orElse: () => null);
       print('STOP GEO POINT TYPE -- ${selectedRoute['stops'][0]}');
       if (selectedRoute != null) {
         _routeNameController.text = selectedRoute['routeName'];
@@ -87,13 +84,10 @@ class _RouteEditScreenState extends State<RouteEditScreen> {
         generatedRRuleNotifier.value = selectedRoute['rrule'];
         List<dynamic> stops = selectedRoute['stops'];
         routeId = selectedRoute['routeID'];
-        Provider.of<LoadingProvider>(context, listen: false)
-            .changeEditRouteLoadingState(true);
+        Provider.of<LoadingProvider>(context, listen: false).changeEditRouteLoadingState(true);
         for (int i = 0; i < stops.length; i++) {
-          double latitude =
-              double.parse(stops[i].split(',')[0].split(':')[1].trim());
-          double longitude = double.parse(
-              stops[i].split(',')[1].split(':')[1].replaceAll('}', '').trim());
+          double latitude = double.parse(stops[i].split(',')[0].split(':')[1].trim());
+          double longitude = double.parse(stops[i].split(',')[1].split(':')[1].replaceAll('}', '').trim());
           userAddedStops.add(LatLng(latitude, longitude));
           String? locationName = await getPlaceName(latitude, longitude);
           _stopNameControllers.add(
@@ -103,8 +97,7 @@ class _RouteEditScreenState extends State<RouteEditScreen> {
             TextEditingController(text: stops[i]),
           );
         }
-        Provider.of<LoadingProvider>(context, listen: false)
-            .changeEditRouteLoadingState(false);
+        Provider.of<LoadingProvider>(context, listen: false).changeEditRouteLoadingState(false);
       }
       // }
       return true;
@@ -113,17 +106,14 @@ class _RouteEditScreenState extends State<RouteEditScreen> {
     }
   }
 
-  void _saveToFirebase(User user, String tags, List<DateTime> dates,
-      String? generatedRRule, String lastEdited) async {
-    DocumentReference userRef =
-        FirebaseFirestore.instance.collection('users').doc(user.uid);
+  void _saveToFirebase(User user, String tags, List<DateTime> dates, String? generatedRRule, String lastEdited) async {
+    DocumentReference userRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
     // Fetch the user's data
     DocumentSnapshot<Object?> userDoc = await userRef.get();
     List<dynamic> userRoutes = userDoc.get('routes') ?? [];
     print('userRouts: $userRoutes');
     // Find the index of the existing route
-    int existingRouteIndex = userRoutes
-        .indexWhere((route) => route['routeName'] == widget.routeName);
+    int existingRouteIndex = userRoutes.indexWhere((route) => route['routeName'] == widget.routeName);
     if (existingRouteIndex != -1) {
       // Update the route at the existing index
       userRoutes[existingRouteIndex] = {
@@ -161,10 +151,9 @@ class _RouteEditScreenState extends State<RouteEditScreen> {
 
   void _updateRoute() {
     String routeName = _routeNameController.text;
-    List<String> stops =
-        _stopControllers.map((controller) => controller.text).toList();
+    List<String> stops = _stopControllers.map((controller) => controller.text).toList();
     String tags = '';
-    List<String> tagsList = _textfieldTagsController.getTags!;
+    List<String> tagsList = _textfieldTagsController.getTags! as List<String>;
     if (tagsList.isNotEmpty) {
       for (int i = 0; i < tagsList.length; i++) {
         if (i == tagsList.length - 1) {
@@ -199,8 +188,7 @@ class _RouteEditScreenState extends State<RouteEditScreen> {
         builder: (context) {
           return AlertDialog(
             title: const Text('Invalid Tags'),
-            content:
-                const Text('Tags must consist of letters separated by commas.'),
+            content: const Text('Tags must consist of letters separated by commas.'),
             actions: [
               TextButton(
                 onPressed: () {
@@ -221,19 +209,16 @@ class _RouteEditScreenState extends State<RouteEditScreen> {
           String? generatedRRule = generatedRRuleNotifier.value;
           List<DateTime> dates = [];
           if (generatedRRule != null && generatedRRule.isNotEmpty) {
-            RecurringDateCalculator dateCalculator =
-                RecurringDateCalculator(generatedRRule);
+            RecurringDateCalculator dateCalculator = RecurringDateCalculator(generatedRRule);
             dates = dateCalculator.calculateRecurringDates();
           }
           String lastEdited = DateTime.now().millisecondsSinceEpoch.toString();
           _saveToFirebase(user, tags, dates, generatedRRule, lastEdited);
-          Provider.of<RouteProvider>(context, listen: false)
-              .updateRoute(routeName, {
+          Provider.of<RouteProvider>(context, listen: false).updateRoute(routeName, {
             'routeID': routeId,
             'lastedited': lastEdited,
             'routeName': _routeNameController.text,
-            'stops':
-                _stopControllers.map((controller) => controller.text).toList(),
+            'stops': _stopControllers.map((controller) => controller.text).toList(),
             'rrule': generatedRRule,
             'dates': dates.map((date) => date.toIso8601String()).toList(),
             'tags': tags,
@@ -270,8 +255,7 @@ class _RouteEditScreenState extends State<RouteEditScreen> {
         builder: (context) {
           return AlertDialog(
             title: const Text('Invalid Route'),
-            content: const Text(
-                'Please provide a non-empty route name and at least two stops.'),
+            content: const Text('Please provide a non-empty route name and at least two stops.'),
             actions: [
               TextButton(
                 onPressed: () {
@@ -349,10 +333,8 @@ class _RouteEditScreenState extends State<RouteEditScreen> {
     );
     if (selectedPoint != null) {
       String updatedStop = selectedPoint.toString();
-      double latitude =
-          double.parse(updatedStop.split(',')[0].split(':')[1].trim());
-      double longitude = double.parse(
-          updatedStop.split(',')[1].split(':')[1].replaceAll('}', '').trim());
+      double latitude = double.parse(updatedStop.split(',')[0].split(':')[1].trim());
+      double longitude = double.parse(updatedStop.split(',')[1].split(':')[1].replaceAll('}', '').trim());
       String? locationName = await getPlaceName(latitude, longitude);
       setState(() {
         _stopNameControllers.add(TextEditingController(text: locationName));
@@ -401,186 +383,173 @@ class _RouteEditScreenState extends State<RouteEditScreen> {
         ],
       ),
       body: Padding(
-              padding: const EdgeInsets.only(
-                  left: 10.0, right: 10, top: 16, bottom: 16),
-              child: Column(
-                children: <Widget>[
-                  TextField(
-                    controller: _routeNameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Route Name',
-                      border: OutlineInputBorder(),
-                    ),
+        padding: const EdgeInsets.only(left: 10.0, right: 10, top: 16, bottom: 16),
+        child: Column(
+          children: <Widget>[
+            TextField(
+              controller: _routeNameController,
+              decoration: const InputDecoration(
+                labelText: 'Route Name',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: TagsAutoCompletion(
+                    textfieldTagsController: _textfieldTagsController,
+                    allTags: widget.allTags,
+                    displayTags: displayTags,
                   ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: TagsAutoCompletion(
-                          textfieldTagsController: _textfieldTagsController,
-                          allTags: widget.allTags,
-                          displayTags: displayTags,
-                        ),
-                      ),
-                      const SizedBox(
-                        width: 10,
-                      ),
-                      ElevatedButton(
-                        onPressed: _editRRule,
-                        child: const Text('Edit RRule'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Stops',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    height: 150,
-                    child: Consumer<LoadingProvider>(
-                      builder: (BuildContext context,
-                          LoadingProvider loadingProvider, Widget? child) {
-                        return loadingProvider.editRouteLoading
-                            ? Center(
-                                child: AnimatedTextKit(
-                                  animatedTexts: [
-                                    TyperAnimatedText('Getting your stop names....'),
-                                  ],
-                                ),
-                              )
-                            : ReorderableListView.builder(
-                                shrinkWrap: true,
-                                itemCount: _stopNameControllers.length,
-                                itemBuilder: (context, index) {
-                                  return Padding(
-                                    key: ValueKey(index),
-                                    padding:
-                                        const EdgeInsets.fromLTRB(0, 0, 0, 5),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: <Widget>[
-                                        const Icon(Icons.reorder),
-                                        Expanded(
-                                          child: TextField(
-                                            controller:
-                                                _stopNameControllers[index],
-                                            decoration: InputDecoration(
-                                              labelText: 'Stop ${index + 1}',
-                                              border:
-                                                  const OutlineInputBorder(),
-                                            ),
-                                          ),
-                                        ),
-                                        if(index != 0)
-                                        IconButton(
-                                          icon: const Icon(Icons.remove_circle),
-                                          onPressed: () => _removeStop(index),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                },
-                                onReorder: (int oldIndex, int newIndex) {
-                                  if (oldIndex < newIndex) {
-                                    newIndex--;
-                                  }
-                                  setState(() {
-                                    _stopNameControllers.insert(
-                                        newIndex,
-                                        _stopNameControllers
-                                            .removeAt(oldIndex));
-                                    _stopControllers.insert(newIndex,
-                                        _stopControllers.removeAt(oldIndex));
-                                    userAddedStops.insert(newIndex,
-                                        userAddedStops.removeAt(oldIndex));
-                                  });
-                                },
-                              );
-                      },
-                    ),
-                  ),
-                  ElevatedButton(
-                    onPressed: _addStop,
-                    child: const Text('Add stop'),
-                  ),
-                  Expanded(
-                    child: flutterMap.FlutterMap(
-                      options: MapOptions(
-                        initialCenter: userAddedStops[0],
-                      ),
-                      children: [
-                        flutterMap.TileLayer(
-                          urlTemplate:
-                              "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-                        ),
-                        flutterMap.MarkerLayer(
-                          markers: [
-                            for (int i = 0; i < userAddedStops.length; i++)
-                              flutterMap.Marker(
-                                point: userAddedStops[i],
-                                child: Stack(
-                                  children: [
-                                    const Icon(Icons.location_on_sharp),
-                                    Positioned(
-                                      left: 0,
-                                      bottom: 1,
-                                      child: Text(
-                                        '${i + 1}',
-                                        style: const TextStyle(
-                                            fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(
+                  width: 10,
+                ),
+                ElevatedButton(
+                  onPressed: _editRRule,
+                  child: const Text('Edit RRule'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Stops',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 150,
+              child: Consumer<LoadingProvider>(
+                builder: (BuildContext context, LoadingProvider loadingProvider, Widget? child) {
+                  return loadingProvider.editRouteLoading
+                      ? Center(
+                          child: AnimatedTextKit(
+                            animatedTexts: [
+                              TyperAnimatedText('Getting your stop names....'),
+                            ],
+                          ),
+                        )
+                      : ReorderableListView.builder(
+                          shrinkWrap: true,
+                          itemCount: _stopNameControllers.length,
+                          itemBuilder: (context, index) {
+                            return Padding(
+                              key: ValueKey(index),
+                              padding: const EdgeInsets.fromLTRB(0, 0, 0, 5),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: <Widget>[
+                                  const Icon(Icons.reorder),
+                                  Expanded(
+                                    child: TextField(
+                                      controller: _stopNameControllers[index],
+                                      decoration: InputDecoration(
+                                        labelText: 'Stop ${index + 1}',
+                                        border: const OutlineInputBorder(),
                                       ),
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                  if (index != 0)
+                                    IconButton(
+                                      icon: const Icon(Icons.remove_circle),
+                                      onPressed: () => _removeStop(index),
+                                    ),
+                                ],
                               ),
-                          ],
-                        ),
-                        flutterMap.PolylineLayer(
-                          polylines: [
-                            flutterMap.Polyline(
-                              points: userAddedStops,
-                              strokeWidth: 3,
-                              color: Colors.blue,
-                            )
-                          ],
-                        ),
-                      ],
-                    ),
+                            );
+                          },
+                          onReorder: (int oldIndex, int newIndex) {
+                            if (oldIndex < newIndex) {
+                              newIndex--;
+                            }
+                            setState(() {
+                              _stopNameControllers.insert(newIndex, _stopNameControllers.removeAt(oldIndex));
+                              _stopControllers.insert(newIndex, _stopControllers.removeAt(oldIndex));
+                              userAddedStops.insert(newIndex, userAddedStops.removeAt(oldIndex));
+                            });
+                          },
+                        );
+                },
+              ),
+            ),
+            ElevatedButton(
+              onPressed: _addStop,
+              child: const Text('Add stop'),
+            ),
+            Expanded(
+              child: flutterMap.FlutterMap(
+                options: MapOptions(
+                  initialCenter: userAddedStops[0],
+                ),
+                children: [
+                  flutterMap.TileLayer(
+                    urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
                   ),
-                  ValueListenableBuilder<String?>(
-                    valueListenable: generatedRRuleNotifier,
-                    builder: (context, savedRRule, child) {
-                      return savedRRule != null
-                          ? Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  width: 1,
-                                  color: Colors.black,
+                  flutterMap.MarkerLayer(
+                    markers: [
+                      for (int i = 0; i < userAddedStops.length; i++)
+                        flutterMap.Marker(
+                          point: userAddedStops[i],
+                          child: Stack(
+                            children: [
+                              const Icon(Icons.location_on_sharp),
+                              Positioned(
+                                left: 0,
+                                bottom: 1,
+                                child: Text(
+                                  '${i + 1}',
+                                  style: const TextStyle(fontWeight: FontWeight.w600),
                                 ),
                               ),
-                              child: Text(
-                                'Generated rrule: $savedRRule',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            )
-                          : const SizedBox.shrink();
-                    },
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                  flutterMap.PolylineLayer(
+                    polylines: [
+                      flutterMap.Polyline(
+                        points: userAddedStops,
+                        strokeWidth: 3,
+                        color: Colors.blue,
+                      )
+                    ],
                   ),
                 ],
               ),
             ),
+            ValueListenableBuilder<String?>(
+              valueListenable: generatedRRuleNotifier,
+              builder: (context, savedRRule, child) {
+                return savedRRule != null
+                    ? Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            width: 1,
+                            color: Colors.black,
+                          ),
+                        ),
+                        child: Text(
+                          'Generated rrule: $savedRRule',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      )
+                    : const SizedBox.shrink();
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

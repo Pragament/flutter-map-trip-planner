@@ -55,11 +55,10 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
     _textfieldTagsController = TextfieldTagsController();
     displayTags = [...widget.selectedTags];
     displayTags.remove('All');
-      marker = flutterMap.Marker(
+    marker = flutterMap.Marker(
       width: 80.0,
       height: 80.0,
-      point: LatLng(widget.currentLocationData!.latitude!,
-          widget.currentLocationData!.longitude!),
+      point: LatLng(widget.currentLocationData!.latitude!, widget.currentLocationData!.longitude!),
       child: const Icon(
         Icons.circle_sharp,
         color: Colors.blue,
@@ -67,13 +66,11 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
       ),
     );
     osm.GeoPoint geoPoint = osm.GeoPoint(
-        latitude: widget.currentLocationData!.latitude!,
-        longitude: widget.currentLocationData!.longitude!);
+        latitude: widget.currentLocationData!.latitude!, longitude: widget.currentLocationData!.longitude!);
     _stopNameControllers.add(TextEditingController(text: widget.locationName));
     _stopControllers.add(TextEditingController(text: geoPoint.toString()));
     flutterMapController = flutterMap.MapController();
-    stops.add(LatLng(widget.currentLocationData!.latitude!,
-        widget.currentLocationData!.longitude!));
+    stops.add(LatLng(widget.currentLocationData!.latitude!, widget.currentLocationData!.longitude!));
   }
 
   @override
@@ -98,8 +95,7 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
   Future<void> _fetchUserAddedStops() async {
     User? user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      List<dynamic> userAddedStopsData =
-          Provider.of<RouteProvider>(context, listen: false).userStops;
+      List<dynamic> userAddedStopsData = Provider.of<RouteProvider>(context, listen: false).userStops;
       print('USER ADDED STOPS : $userAddedStopsData');
       displayedUserAddedStops = userAddedStopsData.map((stopData) {
         return {
@@ -108,16 +104,12 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
         };
       }).toList();
       copy = userAddedStopsData.map((stopData) {
-        return {
-          'stop': stopData['stop'],
-          'selectedPoint': stopData['selectedPoint']
-        };
+        return {'stop': stopData['stop'], 'selectedPoint': stopData['selectedPoint']};
       }).toList();
     }
     setState(() {
-      displayedUserAddedStops.removeWhere((element) =>
-          (element['selectedPoint'].toString().isEmpty ||
-              element['selectedPoint'] == null));
+      displayedUserAddedStops
+          .removeWhere((element) => (element['selectedPoint'].toString().isEmpty || element['selectedPoint'] == null));
       displayedUserAddedStops = displayedUserAddedStops;
     });
   }
@@ -127,12 +119,11 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
 
     if (user != null) {
       String userID = user.uid;
-      DocumentReference userRef =
-          FirebaseFirestore.instance.collection('users').doc(userID);
+      DocumentReference userRef = FirebaseFirestore.instance.collection('users').doc(userID);
 
       await userRef.update({
         'routes': FieldValue.arrayUnion([
-            newRoute,
+          newRoute,
         ]),
       });
     } else {
@@ -142,12 +133,11 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
 
   void _saveRoute() {
     String routeName = _routeNameController.text;
-    List<String> stops =
-        _stopControllers.map((controller) => controller.text).toList();
+    List<String> stops = _stopControllers.map((controller) => controller.text).toList();
     print('STOPS -$stops');
     String? generatedRRule = generatedRRuleNotifier.value;
     String tag = '';
-    List<String> tagsList = _textfieldTagsController.getTags!;
+    List<String> tagsList = _textfieldTagsController.getTags! as List<String>;
     if (tagsList.isNotEmpty) {
       for (int i = 0; i < tagsList.length; i++) {
         if (i == tagsList.length - 1) {
@@ -159,7 +149,7 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
     }
     // RegExp tagRegExp = RegExp(r'^[a-zA-Z]+(?:,[a-zA-Z]+)*$');
     // && !tagRegExp.hasMatch(tag.trim())
-    if (tag.trim().isEmpty ) {
+    if (tag.trim().isEmpty) {
       showDialog(
           context: context,
           builder: (context) {
@@ -180,44 +170,41 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
 
     if (routeName.trim().isNotEmpty && stops.length >= 2) {
       try {
-      List<DateTime> dates = [];
+        List<DateTime> dates = [];
 
-      if (generatedRRule != null && generatedRRule.isNotEmpty) {
-        RecurringDateCalculator dateCalculator =
-            RecurringDateCalculator(generatedRRule);
-        dates = dateCalculator.calculateRecurringDates();
-      }
+        if (generatedRRule != null && generatedRRule.isNotEmpty) {
+          RecurringDateCalculator dateCalculator = RecurringDateCalculator(generatedRRule);
+          dates = dateCalculator.calculateRecurringDates();
+        }
 
-      var newRoute = {
-        'routeID': DateTime.now().millisecondsSinceEpoch.toString(),
-        'routeName': routeName,
-        'stops': stops,
-        'rrule': generatedRRule,
-        'dates': dates.map((date) => date.toIso8601String()).toList(),
-        'tags': tag,
-      };
-      Provider.of<RouteProvider>(context, listen: false).addRoute(newRoute);
-      _saveToFirebase(newRoute);
-      showDialog(
-          context: context,
-          builder: (context) {
-            return AlertDialog(
-              title: const Text('Route added!'),
-              content: const Text('Routes saved successfully.'),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    Navigator.of(context).pushNamedAndRemoveUntil(
-                        '/allroutes', (route) => false);
-                  },
-                  child: const Text('Ok'),
-                ),
-              ],
-            );
-          });
-      }
-      catch (e) {
+        var newRoute = {
+          'routeID': DateTime.now().millisecondsSinceEpoch.toString(),
+          'routeName': routeName,
+          'stops': stops,
+          'rrule': generatedRRule,
+          'dates': dates.map((date) => date.toIso8601String()).toList(),
+          'tags': tag,
+        };
+        Provider.of<RouteProvider>(context, listen: false).addRoute(newRoute);
+        _saveToFirebase(newRoute);
+        showDialog(
+            context: context,
+            builder: (context) {
+              return AlertDialog(
+                title: const Text('Route added!'),
+                content: const Text('Routes saved successfully.'),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      Navigator.of(context).pushNamedAndRemoveUntil('/allroutes', (route) => false);
+                    },
+                    child: const Text('Ok'),
+                  ),
+                ],
+              );
+            });
+      } catch (e) {
         print('Error saving route: $e');
 
         showDialog(
@@ -243,8 +230,7 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
         builder: (context) {
           return AlertDialog(
             title: const Text('Invalid Route'),
-            content: const Text(
-                'Please provide a non-empty route name and at least two stops.'),
+            content: const Text('Please provide a non-empty route name and at least two stops.'),
             actions: [
               TextButton(
                 onPressed: () {
@@ -401,8 +387,7 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
                                 border: const OutlineInputBorder(),
                                 suffixIcon: IconButton(
                                   onPressed: () async {
-                                    final selectedPoint =
-                                        await showSimplePickerLocation(
+                                    final selectedPoint = await showSimplePickerLocation(
                                       context: context,
                                       isDismissible: true,
                                       title: "Select Stop",
@@ -410,8 +395,7 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
                                       zoomOption: const ZoomOption(
                                         initZoom: 15,
                                       ),
-                                      initPosition: parseGeoPoint(
-                                          _stopControllers[index].text),
+                                      initPosition: parseGeoPoint(_stopControllers[index].text),
                                       radius: 15.0,
                                     );
                                     if (selectedPoint != null) {
@@ -419,14 +403,10 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
                                       double latitude = geoPoint.latitude;
                                       double longitude = geoPoint.longitude;
                                       setState(() {
-                                        stops[index] =
-                                            LatLng(latitude, longitude);
+                                        stops[index] = LatLng(latitude, longitude);
                                       });
-                                      _stopNameControllers[index].text =
-                                          (await getPlaceName(
-                                              latitude, longitude))!;
-                                      _stopControllers[index].text =
-                                          geoPoint.toString();
+                                      _stopNameControllers[index].text = (await getPlaceName(latitude, longitude))!;
+                                      _stopControllers[index].text = geoPoint.toString();
                                     }
                                   },
                                   icon: const Icon(Icons.gps_not_fixed),
@@ -446,10 +426,8 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
                     if (oldIndex < newIndex) {
                       newIndex--;
                     }
-                    TextEditingController stopNameController =
-                        _stopNameControllers.removeAt(oldIndex);
-                    TextEditingController stopController =
-                        _stopControllers.removeAt(oldIndex);
+                    TextEditingController stopNameController = _stopNameControllers.removeAt(oldIndex);
+                    TextEditingController stopController = _stopControllers.removeAt(oldIndex);
                     LatLng stop = stops.removeAt(oldIndex);
                     _stopNameControllers.insert(newIndex, stopNameController);
                     _stopControllers.insert(newIndex, stopController);
@@ -466,7 +444,7 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
                   longitude: widget.currentLocationData!.longitude!,
                 );
                 String? updatedStopName;
-                List<dynamic>  data = await Navigator.push(
+                List<dynamic> data = await Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (ctx) => RouteAddStopScreen(
@@ -477,22 +455,18 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
                 );
                 updatedStopName = data[0]?.toString() ?? '';
                 selectedPoint = data[1] as osm.GeoPoint;
-                if(updatedStopName.trim().isEmpty)
-                  {
-                    updatedStopName = await getPlaceName(
-                      selectedPoint.latitude,
-                      selectedPoint.longitude,
-                    );
-                  }
+                if (updatedStopName.trim().isEmpty) {
+                  updatedStopName = await getPlaceName(
+                    selectedPoint.latitude,
+                    selectedPoint.longitude,
+                  );
+                }
                 String updatedStop = selectedPoint.toString();
                 setState(() {
-                  _stopNameControllers
-                      .add(TextEditingController(text: updatedStopName));
-                  _stopControllers
-                      .add(TextEditingController(text: updatedStop));
+                  _stopNameControllers.add(TextEditingController(text: updatedStopName));
+                  _stopControllers.add(TextEditingController(text: updatedStop));
                   _stopFocusNodes.add(FocusNode());
-                  stops.add(
-                      LatLng(selectedPoint.latitude, selectedPoint.longitude));
+                  stops.add(LatLng(selectedPoint.latitude, selectedPoint.longitude));
                 });
               }, // _addStop
               child: const Text('Add Stop'),
@@ -511,8 +485,7 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
                     ),
                     children: [
                       flutterMap.TileLayer(
-                        urlTemplate:
-                            "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                        urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
                       ),
                       flutterMap.PolylineLayer(
                         polylines: [
@@ -563,25 +536,19 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
                     bottom: 10,
                     right: 10,
                     child: Consumer<LoadingProvider>(
-                      builder: (BuildContext context,
-                          LoadingProvider loadingProvider, Widget? child) {
+                      builder: (BuildContext context, LoadingProvider loadingProvider, Widget? child) {
                         return FloatingActionButton(
                           onPressed: () async {
-                            loadingProvider
-                                .changeRouteCreationUpdateLocationState(true);
-                            widget.currentLocationData =
-                                await fetchCurrentLocation();
-                            loadingProvider
-                                .changeRouteCreationUpdateLocationState(false);
-                            print(
-                                'Updated Location  ==>  $widget.currentLocationData');
+                            loadingProvider.changeRouteCreationUpdateLocationState(true);
+                            widget.currentLocationData = await fetchCurrentLocation();
+                            loadingProvider.changeRouteCreationUpdateLocationState(false);
+                            print('Updated Location  ==>  $widget.currentLocationData');
                             setState(() {
                               marker = flutterMap.Marker(
                                 width: 80.0,
                                 height: 80.0,
                                 point: LatLng(
-                                    widget.currentLocationData!.latitude!,
-                                    widget.currentLocationData!.longitude!),
+                                    widget.currentLocationData!.latitude!, widget.currentLocationData!.longitude!),
                                 child: const Icon(
                                   Icons.circle_sharp,
                                   color: Colors.blue,

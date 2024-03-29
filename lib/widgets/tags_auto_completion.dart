@@ -62,7 +62,7 @@ class TagsAutoCompletion extends StatelessWidget {
         });
       },
       onSelected: (String selectedTag) {
-        textfieldTagsController.addTag = selectedTag;
+        textfieldTagsController.addTag(selectedTag);
       },
       fieldViewBuilder: (context, ttec, tfn, onFieldSubmitted) {
         return TextFieldTags(
@@ -72,77 +72,72 @@ class TagsAutoCompletion extends StatelessWidget {
           initialTags: displayTags,
           textSeparators: const [','],
           letterCase: LetterCase.normal,
-          validator: (String tag) {
+          validator: (tag) {
             if (textfieldTagsController.getTags!.contains(tag)) {
               return 'you already entered that';
             }
             return null;
           },
-          inputfieldBuilder: (context, tec, fn, error, onChanged, onSubmitted) {
-            return ((context, sc, tags, onTagDelete) {
-              return TextField(
-                controller: tec,
-                focusNode: fn,
-                decoration: InputDecoration(
-                  border: const OutlineInputBorder(),
-                  helperStyle: const TextStyle(
-                    color: Color.fromARGB(255, 74, 137, 92),
-                  ),
-                  labelText: 'tags',
-                  hintText: 'Seperate each tag using (,)',
-                  errorText: error,
-                  prefixIcon: tags.isNotEmpty
-                      ? SingleChildScrollView(
-                          controller: sc,
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                              children: tags.map((String tag) {
-                            return Container(
-                              decoration: const BoxDecoration(
-                                borderRadius: BorderRadius.all(
-                                  Radius.circular(20.0),
-                                ),
-                                color: Color.fromARGB(255, 74, 137, 92),
-                              ),
-                              margin: const EdgeInsets.only(right: 10.0),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 10.0, vertical: 4.0),
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  InkWell(
-                                    child: Text(
-                                      '#$tag',
-                                      style:
-                                          const TextStyle(color: Colors.white),
-                                    ),
-                                    onTap: () {
-                                      //print("$tag selected");
-                                    },
-                                  ),
-                                  const SizedBox(width: 4.0),
-                                  InkWell(
-                                    child: const Icon(
-                                      Icons.cancel,
-                                      size: 14.0,
-                                      color: Color.fromARGB(255, 233, 233, 233),
-                                    ),
-                                    onTap: () {
-                                      onTagDelete(tag);
-                                    },
-                                  )
-                                ],
-                              ),
-                            );
-                          }).toList()),
-                        )
-                      : null,
+          inputFieldBuilder: (context, textFieldTagValues) {
+            return TextField(
+              controller: textFieldTagValues.textEditingController,
+              focusNode: textFieldTagValues.focusNode,
+              decoration: InputDecoration(
+                border: const OutlineInputBorder(),
+                helperStyle: const TextStyle(
+                  color: Color.fromARGB(255, 74, 137, 92),
                 ),
-                onChanged: onChanged,
-                onSubmitted: onSubmitted,
-              );
-            });
+                labelText: 'tags',
+                hintText: 'Seperate each tag using (,)',
+                errorText: textFieldTagValues.error,
+                prefixIcon: textFieldTagValues.tags.isNotEmpty
+                    ? SingleChildScrollView(
+                        controller: textFieldTagValues.tagScrollController,
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                            children: List.generate(
+                                textFieldTagValues.tags.length,
+                                (index) => Container(
+                                      decoration: const BoxDecoration(
+                                        borderRadius: BorderRadius.all(
+                                          Radius.circular(20.0),
+                                        ),
+                                        color: Color.fromARGB(255, 74, 137, 92),
+                                      ),
+                                      margin: const EdgeInsets.only(right: 10.0),
+                                      padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          InkWell(
+                                            child: Text(
+                                              '#${textFieldTagValues.tags.elementAt(index)}',
+                                              style: const TextStyle(color: Colors.white),
+                                            ),
+                                            onTap: () {
+                                              //print("$tag selected");
+                                            },
+                                          ),
+                                          const SizedBox(width: 4.0),
+                                          InkWell(
+                                            child: const Icon(
+                                              Icons.cancel,
+                                              size: 14.0,
+                                              color: Color.fromARGB(255, 233, 233, 233),
+                                            ),
+                                            onTap: () {
+                                              textFieldTagValues.onTagDelete(textFieldTagValues.tags.elementAt(index));
+                                            },
+                                          )
+                                        ],
+                                      ),
+                                    ))),
+                      )
+                    : null,
+              ),
+              onChanged: textFieldTagValues.onChanged,
+              onSubmitted: textFieldTagValues.onSubmitted,
+            );
           },
         );
       },

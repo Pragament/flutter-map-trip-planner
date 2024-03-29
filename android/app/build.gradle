@@ -33,7 +33,7 @@ if (keystorePropertiesFile.exists()) {
 android {
     namespace "com.example.driver_app"
     // compileSdkVersion flutter.compileSdkVersion
-    compileSdkVersion 33
+    compileSdkVersion 34
     ndkVersion flutter.ndkVersion
 
     compileOptions {
