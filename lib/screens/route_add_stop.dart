@@ -1,11 +1,10 @@
-
 import 'package:flutter/material.dart';
 
 import 'package:flutter_osm_interface/flutter_osm_interface.dart' as osm;
 import 'package:flutter_osm_plugin/flutter_osm_plugin.dart';
 import 'package:location/location.dart';
 
-import 'package:driver_app/models/place_geo_points.dart';
+import 'package:flutter_map_trip_planner/models/place_geo_points.dart';
 import '../data/find_place.dart';
 import '../models/place_suggestion.dart';
 
@@ -36,7 +35,8 @@ class _RouteAddStopScreenState extends State<RouteAddStopScreen> {
     super.initState();
     findPlace = FindPlace();
     filteredList = widget.displayedUserAddedStops;
-    suggestions = FindPlace().placeNameAutocompletion('', widget.currentLocationData);
+    suggestions =
+        FindPlace().placeNameAutocompletion('', widget.currentLocationData);
   }
 
   @override
@@ -135,7 +135,8 @@ class _RouteAddStopScreenState extends State<RouteAddStopScreen> {
                       controller: googleSearchController,
                       onChanged: (place) {
                         setState(() {
-                          suggestions = FindPlace().placeNameAutocompletion(place ?? '', widget.currentLocationData);
+                          suggestions = FindPlace().placeNameAutocompletion(
+                              place ?? '', widget.currentLocationData);
                         });
                       },
                       decoration: const InputDecoration(
@@ -167,14 +168,13 @@ class _RouteAddStopScreenState extends State<RouteAddStopScreen> {
                       ),
                     ),
                     FutureBuilder(
-                      future: suggestions,
-                      builder: (context, snapshot) {
-                        if(snapshot.connectionState == ConnectionState.waiting)
-                          {
+                        future: suggestions,
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
                             return const SizedBox.shrink();
                           }
-                        if(snapshot.data != null)
-                          {
+                          if (snapshot.data != null) {
                             print(snapshot.data?[0].placeName);
                             return SizedBox(
                               height: 200,
@@ -184,24 +184,25 @@ class _RouteAddStopScreenState extends State<RouteAddStopScreen> {
                                 itemBuilder: (BuildContext context, int index) {
                                   return ListTile(
                                     onTap: () async {
-                                      PlaceGeoPoints geoPoints = await FindPlace().fetchPlaceGeoPoints(snapshot.data![index].placeId);
-                                      if(context.mounted)
-                                        {
-                                          Navigator.pop(context, [
-                                            snapshot.data![index].placeName,
-                                            geoPoints.selectedPoint
-                                          ]);
-                                        }
+                                      PlaceGeoPoints geoPoints =
+                                          await FindPlace().fetchPlaceGeoPoints(
+                                              snapshot.data![index].placeId);
+                                      if (context.mounted) {
+                                        Navigator.pop(context, [
+                                          snapshot.data![index].placeName,
+                                          geoPoints.selectedPoint
+                                        ]);
+                                      }
                                     },
-                                    title: Text(snapshot.data![index].placeName),
+                                    title:
+                                        Text(snapshot.data![index].placeName),
                                   );
                                 },
                               ),
                             );
                           }
-                       return const SizedBox.shrink();
-                      }
-                    ),
+                          return const SizedBox.shrink();
+                        }),
                   ],
                 ),
               ),
@@ -301,49 +302,47 @@ class _RouteAddStopScreenState extends State<RouteAddStopScreen> {
                   filteredList.isEmpty
                       ? const SizedBox.shrink()
                       : SingleChildScrollView(
-                        child: Column(
-                          children: filteredList.map((stop) {
-                            return Padding(
-                              padding:
-                                  const EdgeInsets.fromLTRB(0, 0, 0, 10),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: TextField(
-                                      readOnly: true,
-                                      controller: TextEditingController(
-                                          text: stop['stop']),
-                                      decoration: const InputDecoration(
-                                        labelText: 'Stop',
-                                        border: OutlineInputBorder(),
+                          child: Column(
+                            children: filteredList.map((stop) {
+                              return Padding(
+                                padding: const EdgeInsets.fromLTRB(0, 0, 0, 10),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: TextField(
+                                        readOnly: true,
+                                        controller: TextEditingController(
+                                            text: stop['stop']),
+                                        decoration: const InputDecoration(
+                                          labelText: 'Stop',
+                                          border: OutlineInputBorder(),
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.add_circle),
-                                    onPressed: () {
-                                      var selectedPoint =
-                                          stop['selectedPoint'];
-                                      Navigator.pop(
-                                        context,
-                                        [
-                                          stop['stop'],
-                                          osm.GeoPoint(
-                                            latitude:
-                                                selectedPoint.latitude,
-                                            longitude:
-                                                selectedPoint.longitude,
-                                          ),
-                                        ],
-                                      );
-                                    },
-                                  ),
-                                ],
-                              ),
-                            );
-                          }).toList(),
+                                    IconButton(
+                                      icon: const Icon(Icons.add_circle),
+                                      onPressed: () {
+                                        var selectedPoint =
+                                            stop['selectedPoint'];
+                                        Navigator.pop(
+                                          context,
+                                          [
+                                            stop['stop'],
+                                            osm.GeoPoint(
+                                              latitude: selectedPoint.latitude,
+                                              longitude:
+                                                  selectedPoint.longitude,
+                                            ),
+                                          ],
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                          ),
                         ),
-                      ),
                 ],
               ),
             ],

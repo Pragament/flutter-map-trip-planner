@@ -1,9 +1,9 @@
 // ignore_for_file: use_build_context_synchronously
 
 import 'package:animated_text_kit/animated_text_kit.dart';
-import 'package:driver_app/providers/loading_provider.dart';
-import 'package:driver_app/providers/route_provider.dart';
-import 'package:driver_app/utilities/rrule_date_calculator.dart';
+import 'package:flutter_map_trip_planner/providers/loading_provider.dart';
+import 'package:flutter_map_trip_planner/providers/route_provider.dart';
+import 'package:flutter_map_trip_planner/utilities/rrule_date_calculator.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';

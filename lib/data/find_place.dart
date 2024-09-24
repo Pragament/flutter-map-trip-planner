@@ -1,7 +1,7 @@
 import 'dart:convert';
 
-import 'package:driver_app/models/place_suggestion.dart';
-import 'package:driver_app/utilities/env.dart';
+import 'package:flutter_map_trip_planner/models/place_suggestion.dart';
+import 'package:flutter_map_trip_planner/utilities/env.dart';
 
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';

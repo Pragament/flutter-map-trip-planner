@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:driver_app/providers/location_provider.dart';
+import 'package:flutter_map_trip_planner/providers/location_provider.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
@@ -12,12 +12,12 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-import 'package:driver_app/providers/filters_provider.dart';
-import 'package:driver_app/providers/route_provider.dart';
-import 'package:driver_app/providers/user_info_provider.dart';
+import 'package:flutter_map_trip_planner/providers/filters_provider.dart';
+import 'package:flutter_map_trip_planner/providers/route_provider.dart';
+import 'package:flutter_map_trip_planner/providers/user_info_provider.dart';
 import 'firebase_options.dart';
-import 'package:driver_app/providers/loading_provider.dart';
-import 'package:driver_app/screens/overlay.dart';
+import 'package:flutter_map_trip_planner/providers/loading_provider.dart';
+import 'package:flutter_map_trip_planner/screens/overlay.dart';
 import 'screens/login.dart';
 import 'widgets/local_notifications.dart';
 import 'widgets/route_table.dart';

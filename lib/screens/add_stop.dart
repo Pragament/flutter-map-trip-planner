@@ -1,9 +1,9 @@
 // ignore_for_file: use_build_context_synchronously
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:driver_app/providers/loading_provider.dart';
-import 'package:driver_app/providers/route_provider.dart';
-import 'package:driver_app/widgets/tags_auto_completion.dart';
+import 'package:flutter_map_trip_planner/providers/loading_provider.dart';
+import 'package:flutter_map_trip_planner/providers/route_provider.dart';
+import 'package:flutter_map_trip_planner/widgets/tags_auto_completion.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart' as flutterMap;
@@ -51,9 +51,10 @@ class _AddStopScreenState extends State<AddStopScreen> {
   void initState() {
     // TODO: implement initState
     super.initState();
-    _selectedPoint =
-        osm.GeoPoint(latitude: widget.currentLocationData!.latitude!, longitude: widget.currentLocationData!.longitude!)
-            .toString();
+    _selectedPoint = osm.GeoPoint(
+            latitude: widget.currentLocationData!.latitude!,
+            longitude: widget.currentLocationData!.longitude!)
+        .toString();
     print(_selectedPoint);
     flutterMapController = flutterMap.MapController();
     _stopController = TextEditingController(text: widget.locationName);
@@ -62,11 +63,13 @@ class _AddStopScreenState extends State<AddStopScreen> {
     _descriptionController = TextEditingController();
     displayTags = [...widget.filteredTags];
     displayTags.remove('All');
-    locationPoint = LatLng(widget.currentLocationData!.latitude!, widget.currentLocationData!.longitude!);
+    locationPoint = LatLng(widget.currentLocationData!.latitude!,
+        widget.currentLocationData!.longitude!);
     marker = marker = flutterMap.Marker(
       width: 80.0,
       height: 80.0,
-      point: LatLng(widget.currentLocationData!.latitude!, widget.currentLocationData!.longitude!),
+      point: LatLng(widget.currentLocationData!.latitude!,
+          widget.currentLocationData!.longitude!),
       child: const Icon(
         Icons.circle_sharp,
         color: Colors.blue,
@@ -79,13 +82,19 @@ class _AddStopScreenState extends State<AddStopScreen> {
     User? user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       if (widget.isEdit != null && !widget.isEdit!) {
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .update({
           'useraddedstops': FieldValue.arrayUnion([newStop]),
         });
       } else {
-        CollectionReference collectionReference = FirebaseFirestore.instance.collection('users');
+        CollectionReference collectionReference =
+            FirebaseFirestore.instance.collection('users');
         List<Map<String, dynamic>> updatedStops = [];
-        Provider.of<RouteProvider>(context, listen: false).userStops.map((stop) {
+        Provider.of<RouteProvider>(context, listen: false)
+            .userStops
+            .map((stop) {
           Map<String, dynamic> userAddedStop = {};
           userAddedStop['stop'] = stop['stop'];
           userAddedStop['tags'] = stop['tags'];
@@ -120,7 +129,8 @@ class _AddStopScreenState extends State<AddStopScreen> {
             onPressed: () {
               String stop = _stopController.text.trim();
               String tag = '';
-              List<String> tagsList = _textfieldTagsController.getTags! as List<String>;
+              List<String> tagsList =
+                  _textfieldTagsController.getTags! as List<String>;
               if (tagsList.isNotEmpty) {
                 for (int i = 0; i < tagsList.length; i++) {
                   if (i == tagsList.length - 1) {
@@ -144,12 +154,18 @@ class _AddStopScreenState extends State<AddStopScreen> {
                     'tags': tag,
                     'selectedPoint': _selectedPoint,
                   };
-                  double latitude = double.parse(_selectedPoint.split(',')[0].split(':')[1].trim());
-                  double longitude =
-                      double.parse(_selectedPoint.split(',')[1].split(':')[1].replaceAll('}', '').trim());
+                  double latitude = double.parse(
+                      _selectedPoint.split(',')[0].split(':')[1].trim());
+                  double longitude = double.parse(_selectedPoint
+                      .split(',')[1]
+                      .split(':')[1]
+                      .replaceAll('}', '')
+                      .trim());
                   if (widget.index != null && widget.isEdit!) {
-                    Provider.of<RouteProvider>(context, listen: false).deleteStop(widget.index!);
-                    Provider.of<RouteProvider>(context, listen: false).addStopAt(
+                    Provider.of<RouteProvider>(context, listen: false)
+                        .deleteStop(widget.index!);
+                    Provider.of<RouteProvider>(context, listen: false)
+                        .addStopAt(
                       widget.index!,
                       {
                         'stop': stop,
@@ -266,8 +282,10 @@ class _AddStopScreenState extends State<AddStopScreen> {
                       setState(() {
                         locationPoint = LatLng(latitude, longitude);
                       });
-                      _stopController.text = (await getPlaceName(latitude, longitude))!;
-                      flutterMapController.move(LatLng(latitude, longitude), 14);
+                      _stopController.text =
+                          (await getPlaceName(latitude, longitude))!;
+                      flutterMapController.move(
+                          LatLng(latitude, longitude), 14);
                     }
                   },
                   child: const Icon(Icons.location_searching_rounded),
@@ -311,7 +329,8 @@ class _AddStopScreenState extends State<AddStopScreen> {
                       ),
                       children: [
                         flutterMap.TileLayer(
-                          urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                          urlTemplate:
+                              "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
                         ),
                         flutterMap.MarkerLayer(
                           markers: [
@@ -334,13 +353,18 @@ class _AddStopScreenState extends State<AddStopScreen> {
                     bottom: 10,
                     right: 10,
                     child: Consumer<LoadingProvider>(
-                      builder: (BuildContext context, LoadingProvider loadingProvider, Widget? child) {
+                      builder: (BuildContext context,
+                          LoadingProvider loadingProvider, Widget? child) {
                         return FloatingActionButton(
                           onPressed: () async {
-                            loadingProvider.changeAddStopsUpdateLocationState(true);
-                            widget.currentLocationData = await fetchCurrentLocation();
-                            loadingProvider.changeAddStopsUpdateLocationState(false);
-                            print('Updated Location  ==>  ${widget.currentLocationData}');
+                            loadingProvider
+                                .changeAddStopsUpdateLocationState(true);
+                            widget.currentLocationData =
+                                await fetchCurrentLocation();
+                            loadingProvider
+                                .changeAddStopsUpdateLocationState(false);
+                            print(
+                                'Updated Location  ==>  ${widget.currentLocationData}');
                             flutterMapController.move(
                                 LatLng(
                                   widget.currentLocationData!.latitude!,
@@ -352,7 +376,8 @@ class _AddStopScreenState extends State<AddStopScreen> {
                                 width: 80.0,
                                 height: 80.0,
                                 point: LatLng(
-                                    widget.currentLocationData!.latitude!, widget.currentLocationData!.longitude!),
+                                    widget.currentLocationData!.latitude!,
+                                    widget.currentLocationData!.longitude!),
                                 child: const Icon(
                                   Icons.circle_sharp,
                                   color: Colors.blue,

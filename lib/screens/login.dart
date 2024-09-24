@@ -1,7 +1,7 @@
 // ignore_for_file: use_build_context_synchronously
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:driver_app/screens/profile.dart';
+import 'package:flutter_map_trip_planner/screens/profile.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -134,7 +134,7 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
                   });
                 },
                 initialValue: number,
-                maxLength: 11,
+                // maxLength: 11,
                 inputDecoration: InputDecoration(
                     border: InputBorder.none,
                     enabled: isPhoneNumberVerified ? false : true,

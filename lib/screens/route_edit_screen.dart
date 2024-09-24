@@ -14,9 +14,9 @@ import 'package:provider/provider.dart';
 import 'package:rrule_generator/rrule_generator.dart';
 import 'package:textfield_tags/textfield_tags.dart';
 
-import 'package:driver_app/providers/loading_provider.dart';
-import 'package:driver_app/utilities/rrule_date_calculator.dart';
-import 'package:driver_app/widgets/tags_auto_completion.dart';
+import 'package:flutter_map_trip_planner/providers/loading_provider.dart';
+import 'package:flutter_map_trip_planner/utilities/rrule_date_calculator.dart';
+import 'package:flutter_map_trip_planner/widgets/tags_auto_completion.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../providers/route_provider.dart';
 import '../utilities/location_functions.dart';
@@ -74,8 +74,11 @@ class _RouteEditScreenState extends State<RouteEditScreen> {
       //     .doc(user.uid)
       //     .get();
       // List<dynamic> userRoutes = userDoc.get('routes') ?? [];
-      List<dynamic> userRoutes = Provider.of<RouteProvider>(context, listen: false).userRoutes;
-      var selectedRoute = userRoutes.firstWhere((route) => route['routeName'] == widget.routeName, orElse: () => null);
+      List<dynamic> userRoutes =
+          Provider.of<RouteProvider>(context, listen: false).userRoutes;
+      var selectedRoute = userRoutes.firstWhere(
+          (route) => route['routeName'] == widget.routeName,
+          orElse: () => null);
       print('STOP GEO POINT TYPE -- ${selectedRoute['stops'][0]}');
       if (selectedRoute != null) {
         _routeNameController.text = selectedRoute['routeName'];
@@ -84,10 +87,13 @@ class _RouteEditScreenState extends State<RouteEditScreen> {
         generatedRRuleNotifier.value = selectedRoute['rrule'];
         List<dynamic> stops = selectedRoute['stops'];
         routeId = selectedRoute['routeID'];
-        Provider.of<LoadingProvider>(context, listen: false).changeEditRouteLoadingState(true);
+        Provider.of<LoadingProvider>(context, listen: false)
+            .changeEditRouteLoadingState(true);
         for (int i = 0; i < stops.length; i++) {
-          double latitude = double.parse(stops[i].split(',')[0].split(':')[1].trim());
-          double longitude = double.parse(stops[i].split(',')[1].split(':')[1].replaceAll('}', '').trim());
+          double latitude =
+              double.parse(stops[i].split(',')[0].split(':')[1].trim());
+          double longitude = double.parse(
+              stops[i].split(',')[1].split(':')[1].replaceAll('}', '').trim());
           userAddedStops.add(LatLng(latitude, longitude));
           String? locationName = await getPlaceName(latitude, longitude);
           _stopNameControllers.add(
@@ -97,7 +103,8 @@ class _RouteEditScreenState extends State<RouteEditScreen> {
             TextEditingController(text: stops[i]),
           );
         }
-        Provider.of<LoadingProvider>(context, listen: false).changeEditRouteLoadingState(false);
+        Provider.of<LoadingProvider>(context, listen: false)
+            .changeEditRouteLoadingState(false);
       }
       // }
       return true;
@@ -106,14 +113,17 @@ class _RouteEditScreenState extends State<RouteEditScreen> {
     }
   }
 
-  void _saveToFirebase(User user, String tags, List<DateTime> dates, String? generatedRRule, String lastEdited) async {
-    DocumentReference userRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+  void _saveToFirebase(User user, String tags, List<DateTime> dates,
+      String? generatedRRule, String lastEdited) async {
+    DocumentReference userRef =
+        FirebaseFirestore.instance.collection('users').doc(user.uid);
     // Fetch the user's data
     DocumentSnapshot<Object?> userDoc = await userRef.get();
     List<dynamic> userRoutes = userDoc.get('routes') ?? [];
     print('userRouts: $userRoutes');
     // Find the index of the existing route
-    int existingRouteIndex = userRoutes.indexWhere((route) => route['routeName'] == widget.routeName);
+    int existingRouteIndex = userRoutes
+        .indexWhere((route) => route['routeName'] == widget.routeName);
     if (existingRouteIndex != -1) {
       // Update the route at the existing index
       userRoutes[existingRouteIndex] = {
@@ -151,7 +161,8 @@ class _RouteEditScreenState extends State<RouteEditScreen> {
 
   void _updateRoute() {
     String routeName = _routeNameController.text;
-    List<String> stops = _stopControllers.map((controller) => controller.text).toList();
+    List<String> stops =
+        _stopControllers.map((controller) => controller.text).toList();
     String tags = '';
     List<String> tagsList = _textfieldTagsController.getTags! as List<String>;
     if (tagsList.isNotEmpty) {
@@ -188,7 +199,8 @@ class _RouteEditScreenState extends State<RouteEditScreen> {
         builder: (context) {
           return AlertDialog(
             title: const Text('Invalid Tags'),
-            content: const Text('Tags must consist of letters separated by commas.'),
+            content:
+                const Text('Tags must consist of letters separated by commas.'),
             actions: [
               TextButton(
                 onPressed: () {
@@ -209,16 +221,19 @@ class _RouteEditScreenState extends State<RouteEditScreen> {
           String? generatedRRule = generatedRRuleNotifier.value;
           List<DateTime> dates = [];
           if (generatedRRule != null && generatedRRule.isNotEmpty) {
-            RecurringDateCalculator dateCalculator = RecurringDateCalculator(generatedRRule);
+            RecurringDateCalculator dateCalculator =
+                RecurringDateCalculator(generatedRRule);
             dates = dateCalculator.calculateRecurringDates();
           }
           String lastEdited = DateTime.now().millisecondsSinceEpoch.toString();
           _saveToFirebase(user, tags, dates, generatedRRule, lastEdited);
-          Provider.of<RouteProvider>(context, listen: false).updateRoute(routeName, {
+          Provider.of<RouteProvider>(context, listen: false)
+              .updateRoute(routeName, {
             'routeID': routeId,
             'lastedited': lastEdited,
             'routeName': _routeNameController.text,
-            'stops': _stopControllers.map((controller) => controller.text).toList(),
+            'stops':
+                _stopControllers.map((controller) => controller.text).toList(),
             'rrule': generatedRRule,
             'dates': dates.map((date) => date.toIso8601String()).toList(),
             'tags': tags,
@@ -255,7 +270,8 @@ class _RouteEditScreenState extends State<RouteEditScreen> {
         builder: (context) {
           return AlertDialog(
             title: const Text('Invalid Route'),
-            content: const Text('Please provide a non-empty route name and at least two stops.'),
+            content: const Text(
+                'Please provide a non-empty route name and at least two stops.'),
             actions: [
               TextButton(
                 onPressed: () {
@@ -333,8 +349,10 @@ class _RouteEditScreenState extends State<RouteEditScreen> {
     );
     if (selectedPoint != null) {
       String updatedStop = selectedPoint.toString();
-      double latitude = double.parse(updatedStop.split(',')[0].split(':')[1].trim());
-      double longitude = double.parse(updatedStop.split(',')[1].split(':')[1].replaceAll('}', '').trim());
+      double latitude =
+          double.parse(updatedStop.split(',')[0].split(':')[1].trim());
+      double longitude = double.parse(
+          updatedStop.split(',')[1].split(':')[1].replaceAll('}', '').trim());
       String? locationName = await getPlaceName(latitude, longitude);
       setState(() {
         _stopNameControllers.add(TextEditingController(text: locationName));
@@ -383,7 +401,8 @@ class _RouteEditScreenState extends State<RouteEditScreen> {
         ],
       ),
       body: Padding(
-        padding: const EdgeInsets.only(left: 10.0, right: 10, top: 16, bottom: 16),
+        padding:
+            const EdgeInsets.only(left: 10.0, right: 10, top: 16, bottom: 16),
         child: Column(
           children: <Widget>[
             TextField(
@@ -425,7 +444,8 @@ class _RouteEditScreenState extends State<RouteEditScreen> {
             SizedBox(
               height: 150,
               child: Consumer<LoadingProvider>(
-                builder: (BuildContext context, LoadingProvider loadingProvider, Widget? child) {
+                builder: (BuildContext context, LoadingProvider loadingProvider,
+                    Widget? child) {
                   return loadingProvider.editRouteLoading
                       ? Center(
                           child: AnimatedTextKit(
@@ -442,7 +462,8 @@ class _RouteEditScreenState extends State<RouteEditScreen> {
                               key: ValueKey(index),
                               padding: const EdgeInsets.fromLTRB(0, 0, 0, 5),
                               child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: <Widget>[
                                   const Icon(Icons.reorder),
                                   Expanded(
@@ -468,9 +489,12 @@ class _RouteEditScreenState extends State<RouteEditScreen> {
                               newIndex--;
                             }
                             setState(() {
-                              _stopNameControllers.insert(newIndex, _stopNameControllers.removeAt(oldIndex));
-                              _stopControllers.insert(newIndex, _stopControllers.removeAt(oldIndex));
-                              userAddedStops.insert(newIndex, userAddedStops.removeAt(oldIndex));
+                              _stopNameControllers.insert(newIndex,
+                                  _stopNameControllers.removeAt(oldIndex));
+                              _stopControllers.insert(newIndex,
+                                  _stopControllers.removeAt(oldIndex));
+                              userAddedStops.insert(
+                                  newIndex, userAddedStops.removeAt(oldIndex));
                             });
                           },
                         );
@@ -488,7 +512,8 @@ class _RouteEditScreenState extends State<RouteEditScreen> {
                 ),
                 children: [
                   flutterMap.TileLayer(
-                    urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                    urlTemplate:
+                        "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
                   ),
                   flutterMap.MarkerLayer(
                     markers: [
@@ -503,7 +528,8 @@ class _RouteEditScreenState extends State<RouteEditScreen> {
                                 bottom: 1,
                                 child: Text(
                                   '${i + 1}',
-                                  style: const TextStyle(fontWeight: FontWeight.w600),
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w600),
                                 ),
                               ),
                             ],
