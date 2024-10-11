@@ -122,21 +122,46 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
     });
   }
 
+  // void _saveToFirebase(dynamic newRoute) async {
+  //   User? user = FirebaseAuth.instance.currentUser;
+
+  //   if (user != null) {
+  //     String userID = user.uid;
+  //     DocumentReference userRef =
+  //         FirebaseFirestore.instance.collection('users').doc(userID);
+
+  //     await userRef.update({
+  //       'routes': FieldValue.arrayUnion([
+  //         newRoute,
+  //       ]),
+  //     });
+  //   } else {
+  //     print('User is not authenticated.');
+  //   }
+  // }
+  
   void _saveToFirebase(dynamic newRoute) async {
     User? user = FirebaseAuth.instance.currentUser;
 
     if (user != null) {
       String userID = user.uid;
+
+      // Step 1: Add the full route details to the 'routes' collection
+      DocumentReference routeRef =
+          await FirebaseFirestore.instance.collection('routes').add(newRoute);
+
+      String routeID = routeRef.id; // Get the document ID of the new route
+
+      // Step 2: Update the user's document with the new route ID in 'routeIds'
       DocumentReference userRef =
           FirebaseFirestore.instance.collection('users').doc(userID);
 
       await userRef.update({
-        'routes': FieldValue.arrayUnion([
-          newRoute,
-        ]),
+        'routeIds': FieldValue.arrayUnion(
+            [routeID]), // Add the new route ID to 'routeIds' array
       });
     } else {
-      print('User is not authenticated.');
+      debugPrint('User is not authenticated.');
     }
   }
 
@@ -189,7 +214,6 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
         }
 
         var newRoute = {
-          'routeID': DateTime.now().millisecondsSinceEpoch.toString(),
           'routeName': routeName,
           'stops': stops,
           'rrule': generatedRRule,
@@ -276,25 +300,32 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
           ),
         ),
         actions: <Widget>[
-          const Text(
-            'Don\'t skip stop conditions or else you will end up with error!',
-            style: TextStyle(
-              color: Colors.red,
-            ),
-          ),
-          TextButton(
-            child: const Text('Cancel'),
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-          ),
-          TextButton(
-            child: const Text('Save'),
-            onPressed: () {
-              final rrule = generatedRRuleNotifier.value;
-              // print(rrule);
-              Navigator.of(context).pop(rrule);
-            },
+          Column(
+            children: [
+              const Text(
+                'Don\'t skip stop conditions or else you will end up with error!',
+                style: TextStyle(
+                  color: Colors.red,
+                ),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    child: const Text('Cancel'),
+                    onPressed: () {},
+                  ),
+                  TextButton(
+                    child: const Text('Save'),
+                    onPressed: () {
+                      final rrule = generatedRRuleNotifier.value;
+                      // print(rrule);
+                      Navigator.of(context).pop(rrule);
+                    },
+                  ),
+                ],
+              ),
+            ],
           ),
         ],
       ),
@@ -310,18 +341,20 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
+      appBar: AppBar( foregroundColor:Colors.white, backgroundColor:Colors.green,
         title: const Text(
           'Create Route',
           style: TextStyle(
             color: Colors.white,
           ),
         ),
-        backgroundColor: Colors.amber,
         actions: [
-          ElevatedButton(
+          TextButton(
             onPressed: _saveRoute,
-            child: const Text('Save Route'),
+            child: const Text(
+              'Save Route',
+              style: TextStyle(color: Colors.white),
+            ),
           ),
           const SizedBox(
             width: 15,
@@ -390,7 +423,7 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
                         const Icon(Icons.reorder),
                         SizedBox(
                           height: 60,
-                          width: MediaQuery.of(context).size.width * 0.75,
+                          width: MediaQuery.of(context).size.width * 0.70,
                           child: TextField(
                             readOnly: true,
                             // enabled: false,

@@ -4,7 +4,7 @@ import 'package:flutter_osm_plugin/flutter_osm_plugin.dart';
 class MapSelectionScreen extends StatefulWidget {
   final List<String> existingStops;
 
-  MapSelectionScreen({required this.existingStops});
+  const MapSelectionScreen({super.key, required this.existingStops});
 
   @override
   _MapSelectionScreenState createState() => _MapSelectionScreenState();
@@ -16,7 +16,7 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
     // 9.75527985137314, 76.64998268216185
     initPosition:
         GeoPoint(latitude: 9.75527985137314, longitude: 76.64998268216185),
-    areaLimit: BoundingBox(
+    areaLimit: const BoundingBox(
       east: 10.4922941,
       north: 47.8084648,
       south: 45.817995,
@@ -36,6 +36,8 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        foregroundColor: Colors.white,
+        backgroundColor: Colors.green,
         title: const Text('Select Stops on Map'),
       ),
       body: OSMFlutter(

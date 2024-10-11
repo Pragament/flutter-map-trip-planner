@@ -65,21 +65,12 @@ class _RouteEditScreenState extends State<RouteEditScreen> {
 
   Future<bool> _fetchRouteDetails() async {
     try {
-      // User? user = FirebaseAuth.instance.currentUser;
-      // if (user != null) {
-      //   print("user: $user");
-      // DocumentSnapshot<Map<String, dynamic>> userDoc = await FirebaseFirestore
-      //     .instance
-      //     .collection('users')
-      //     .doc(user.uid)
-      //     .get();
-      // List<dynamic> userRoutes = userDoc.get('routes') ?? [];
       List<dynamic> userRoutes =
           Provider.of<RouteProvider>(context, listen: false).userRoutes;
       var selectedRoute = userRoutes.firstWhere(
           (route) => route['routeName'] == widget.routeName,
           orElse: () => null);
-      print('STOP GEO POINT TYPE -- ${selectedRoute['stops'][0]}');
+      debugPrint('STOP GEO POINT TYPE -- ${selectedRoute['stops'][0]}');
       if (selectedRoute != null) {
         _routeNameController.text = selectedRoute['routeName'];
         displayTags.add(selectedRoute['tags']);
@@ -113,49 +104,73 @@ class _RouteEditScreenState extends State<RouteEditScreen> {
     }
   }
 
-  void _saveToFirebase(User user, String tags, List<DateTime> dates,
+  // void _savedEditedRouteToFirebase(User user, String tags, List<DateTime> dates,
+  //     String? generatedRRule, String lastEdited) async {
+  //   DocumentReference userRef =
+  //       FirebaseFirestore.instance.collection('users').doc(user.uid);
+  //   // Fetch the user's data
+  //   DocumentSnapshot<Object?> userDoc = await userRef.get();
+  //   List<dynamic> userRoutes = userDoc.get('routes') ?? [];
+  //   debugPrint('userRouts: $userRoutes');
+  //   // Find the index of the existing route
+  //   int existingRouteIndex = userRoutes
+  //       .indexWhere((route) => route['routeName'] == widget.routeName);
+  //   if (existingRouteIndex != -1) {
+  //     // Update the route at the existing index
+  //     userRoutes[existingRouteIndex] = {
+  //       'routeID': routeId,
+  //       'lastedited': DateTime.now().millisecondsSinceEpoch.toString(),
+  //       'routeName': _routeNameController.text,
+  //       'stops': _stopControllers.map((controller) => controller.text).toList(),
+  //       'rrule': generatedRRule,
+  //       'dates': dates.map((date) => date.toIso8601String()).toList(),
+  //       'tags': tags,
+  //     };
+
+  //     await userRef.update({'routes': userRoutes});
+  //   }
+  // }
+
+  void _savedEditedRouteToFirebase(User user, String tags, List<DateTime> dates,
       String? generatedRRule, String lastEdited) async {
-    DocumentReference userRef =
-        FirebaseFirestore.instance.collection('users').doc(user.uid);
-    // Fetch the user's data
-    DocumentSnapshot<Object?> userDoc = await userRef.get();
-    List<dynamic> userRoutes = userDoc.get('routes') ?? [];
-    print('userRouts: $userRoutes');
-    // Find the index of the existing route
-    int existingRouteIndex = userRoutes
-        .indexWhere((route) => route['routeName'] == widget.routeName);
-    if (existingRouteIndex != -1) {
-      // Update the route at the existing index
-      userRoutes[existingRouteIndex] = {
-        'routeID': routeId,
-        'lastedited': DateTime.now().millisecondsSinceEpoch.toString(),
-        'routeName': _routeNameController.text,
-        'stops': _stopControllers.map((controller) => controller.text).toList(),
-        'rrule': generatedRRule,
-        'dates': dates.map((date) => date.toIso8601String()).toList(),
-        'tags': tags,
-      };
+    try {
+      // Step 1: Fetch the route from the 'routes' collection using the routeId
+      DocumentReference routeRef =
+          FirebaseFirestore.instance.collection('routes').doc(routeId);
 
-      await userRef.update({'routes': userRoutes});
+      DocumentSnapshot routeSnapshot = await routeRef.get();
 
-      // showDialog(
-      //   context: context,
-      //   builder: (context) {
-      //     return AlertDialog(
-      //       title: const Text('Route Updated'),
-      //       content: const Text('Route details updated successfully.'),
-      //       actions: [
-      //         TextButton(
-      //           onPressed: () {
-      //             Navigator.of(context).pop();
-      //             Navigator.of(context).pop();
-      //           },
-      //           child: const Text('Ok'),
-      //         ),
-      //       ],
-      //     );
-      //   },
-      // );
+      if (routeSnapshot.exists) {
+        // Step 2: Update the existing route details in the 'routes' collection
+        await routeRef.update({
+          'routeName': _routeNameController.text,
+          'stops':
+              _stopControllers.map((controller) => controller.text).toList(),
+          'rrule': generatedRRule,
+          'dates': dates.map((date) => date.toIso8601String()).toList(),
+          'tags': tags,
+          'lastEdited': DateTime.now().millisecondsSinceEpoch.toString(),
+        });
+
+        // Step 3: Ensure the route ID is linked to the user (optional if already added)
+        DocumentReference userRef =
+            FirebaseFirestore.instance.collection('users').doc(user.uid);
+        DocumentSnapshot userDoc = await userRef.get();
+
+        List<dynamic> userRouteIds = userDoc.get('routeIds') ?? [];
+        if (!userRouteIds.contains(routeId)) {
+          // Add the route ID to the user's document if not already present
+          await userRef.update({
+            'routeIds': FieldValue.arrayUnion([routeId])
+          });
+        }
+
+        debugPrint('Route updated successfully.');
+      } else {
+        debugPrint('Route does not exist in the routes collection.');
+      }
+    } catch (e) {
+      debugPrint('Error updating route: $e');
     }
   }
 
@@ -226,10 +241,10 @@ class _RouteEditScreenState extends State<RouteEditScreen> {
             dates = dateCalculator.calculateRecurringDates();
           }
           String lastEdited = DateTime.now().millisecondsSinceEpoch.toString();
-          _saveToFirebase(user, tags, dates, generatedRRule, lastEdited);
+          _savedEditedRouteToFirebase(
+              user, tags, dates, generatedRRule, lastEdited);
           Provider.of<RouteProvider>(context, listen: false)
               .updateRoute(routeName, {
-            'routeID': routeId,
             'lastedited': lastEdited,
             'routeName': _routeNameController.text,
             'stops':
@@ -241,10 +256,10 @@ class _RouteEditScreenState extends State<RouteEditScreen> {
 
           Navigator.pop(context, true);
         } else {
-          // print('Route not found');
+          // debugPrint('Route not found');
         }
       } catch (e) {
-        // print('Error updating route: $e');
+        // debugPrint('Error updating route: $e');
 
         showDialog(
           context: context,
@@ -378,21 +393,19 @@ class _RouteEditScreenState extends State<RouteEditScreen> {
     for (var controller in _stopControllers) {
       controller.dispose();
     }
-    // _tagsController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
+      appBar: AppBar( foregroundColor:Colors.white, backgroundColor:Colors.green,
         title: const Text(
           'Edit Route',
           style: TextStyle(
             color: Colors.white,
           ),
         ),
-        backgroundColor: Colors.amber,
         actions: [
           IconButton(
             icon: const Icon(Icons.save),

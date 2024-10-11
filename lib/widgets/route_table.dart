@@ -7,7 +7,10 @@ import '../providers/route_provider.dart';
 import '../screens/route_display_screen.dart';
 
 class RouteTable extends StatefulWidget {
-  const RouteTable({Key? key, List<Map<String, dynamic>>? routes});
+  const RouteTable({
+    super.key,
+    List<Map<String, dynamic>>? routes,
+  });
 
   @override
   State<RouteTable> createState() => _RouteTableState();
@@ -17,8 +20,8 @@ class _RouteTableState extends State<RouteTable> {
   List<dynamic>? _routes;
 
   void _fetchRoutes() {
-      _routes =  Provider.of<RouteProvider>(context, listen: false).userRoutes;
-    }
+    _routes = Provider.of<RouteProvider>(context, listen: false).userRoutes;
+  }
 
   @override
   void initState() {
@@ -26,8 +29,6 @@ class _RouteTableState extends State<RouteTable> {
     super.initState();
     _fetchRoutes();
   }
-
-
 
   // void _sendNotificationIfNearestDateIsToday() {
   //   print('Checking');
@@ -85,13 +86,14 @@ class _RouteTableState extends State<RouteTable> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        foregroundColor: Colors.white,
+        backgroundColor: Colors.green,
         title: const Text(
           'Routes - ListView',
           style: TextStyle(
             color: Colors.white,
           ),
         ),
-        backgroundColor: Colors.amber,
       ),
       body: _routes != null
           ? Padding(
@@ -155,7 +157,7 @@ class _RouteTableState extends State<RouteTable> {
               child: CircularProgressIndicator(),
             ),
       // floatingActionButton: FloatingActionButton(
-      //   backgroundColor: Colors.amber,
+      //   backgroundColor: Colors.green,
       //   child: const Icon(
       //     Icons.add,
       //     color: Colors.white,

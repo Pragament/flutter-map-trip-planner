@@ -55,7 +55,7 @@ class _AddStopScreenState extends State<AddStopScreen> {
             latitude: widget.currentLocationData!.latitude!,
             longitude: widget.currentLocationData!.longitude!)
         .toString();
-    print(_selectedPoint);
+    debugPrint(_selectedPoint);
     flutterMapController = flutterMap.MapController();
     _stopController = TextEditingController(text: widget.locationName);
     _textfieldTagsController = TextfieldTagsController();
@@ -119,11 +119,12 @@ class _AddStopScreenState extends State<AddStopScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        foregroundColor: Colors.white,
+        backgroundColor: Colors.green,
         title: const Text(
           'Add Stop',
           style: TextStyle(color: Colors.white),
         ),
-        backgroundColor: Colors.amber,
         actions: [
           ElevatedButton(
             onPressed: () {
@@ -141,11 +142,11 @@ class _AddStopScreenState extends State<AddStopScreen> {
                 }
               }
               // RegExp commaSeparatedTags = RegExp(r'^[a-zA-Z]+(?:,[a-zA-Z]+)*$');
-              print(_stopController.text);
-              print(_textfieldTagsController.getTags);
-              print(tag);
-              print(_selectedPoint);
-              // print(commaSeparatedTags.hasMatch(tag));
+              debugPrint(_stopController.text);
+              debugPrint("${_textfieldTagsController.getTags}");
+              debugPrint(tag);
+              debugPrint(_selectedPoint);
+              // debugPrint(commaSeparatedTags.hasMatch(tag));
 
               if (_stopController.text.isNotEmpty && tag.isNotEmpty) {
                 try {
@@ -363,7 +364,7 @@ class _AddStopScreenState extends State<AddStopScreen> {
                                 await fetchCurrentLocation();
                             loadingProvider
                                 .changeAddStopsUpdateLocationState(false);
-                            print(
+                            debugPrint(
                                 'Updated Location  ==>  ${widget.currentLocationData}');
                             flutterMapController.move(
                                 LatLng(

@@ -50,8 +50,9 @@ class _LocationAppExampleState extends State<LocationAppExample> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        foregroundColor: Colors.white,
+        backgroundColor: Colors.green,
         title: const Text("Location Picker"),
-        backgroundColor: Colors.amber,
       ),
       body: Center(
         child: ElevatedButton(

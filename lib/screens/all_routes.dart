@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter_map_trip_planner/miscellaenous/add_route_to_firebase.dart';
+import 'package:flutter_map_trip_planner/miscellaenous/save_user_location.dart';
 import 'package:flutter_map_trip_planner/providers/location_provider.dart';
 import 'package:flutter_map_trip_planner/screens/route_add_stop.dart';
 import 'package:flutter_map_trip_planner/widgets/filter_item.dart';
@@ -46,7 +48,8 @@ class AllRoutesMapScreen extends StatefulWidget {
   State<AllRoutesMapScreen> createState() => _AllRoutesMapScreenState();
 }
 
-class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
+class _AllRoutesMapScreenState extends State<AllRoutesMapScreen>
+    with WidgetsBindingObserver {
   late MapController flutterMapController;
 
   // LocationData? currentLocation;
@@ -78,8 +81,8 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
   @override
   void initState() {
     super.initState();
-    location.changeSettings(interval: 3000);
-    location.enableBackgroundMode();
+    // location.changeSettings(interval: 3000);
+    // location.enableBackgroundMode();
     selectedTags = allTagsList;
     tileLayer = TileLayer(
       urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
@@ -88,6 +91,66 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
     // getLocation = _fetchCurrentLocationName();
     isSelected.add(true);
     futureList = _fetchAllStops();
+    WidgetsBinding.instance.addObserver(this);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // location.changeSettings(interval: 3000);
+      // location.enableBackgroundMode();
+      askForContinousLocation();
+      askForDisplayOverApps();
+    });
+  }
+
+  void askForContinousLocation() async {
+    bool isEne = await location.isBackgroundModeEnabled();
+    debugPrint('apk: backgroundenabled: $isEne');
+    if (!await location.isBackgroundModeEnabled()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Trying to get background location!'),
+          duration: Durations.short2,
+        ),
+      );
+      location.enableBackgroundMode();
+    }
+  }
+
+  void askForDisplayOverApps() async {
+    if (!await FlutterOverlayWindow.isPermissionGranted()) {
+      showDialog(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            content: const Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.picture_in_picture,
+                  size: 32,
+                  color: Colors.green,
+                ),
+                Text(
+                  'Allowing our app to display over other apps will enhance your user experience by providing timely notifications and interactive features. Would you like to enable this permission?',
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Deny'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  Navigator.pop(context);
+                  await FlutterOverlayWindow.requestPermission();
+                },
+                child: const Text('Allow'),
+              ),
+            ],
+          );
+        },
+      );
+    }
   }
 
   Future<void> _stopsFilter(final filteredStops) async {
@@ -101,8 +164,8 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
   Future<bool> _fetchCurrentLocationName(LocationData currentLocation) async {
     // Provider.of<LoadingProvider>(context, listen: false)
     //     .changeLocationLoadingState(true);
-    print('Location Updated');
-    print(DateTime.now().second);
+    debugPrint('Location Updated');
+    debugPrint("${DateTime.now().second}");
     currentLocation = await fetchCurrentLocation() ??
         LocationData.fromMap({'latitude': 37.4219983, 'longitude': -122.084});
     locationName = await getPlaceName(
@@ -193,34 +256,58 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
   Color _getRouteColor(int index) {
     List<Color> colors = [
       Colors.blue,
-      Colors.green,
+      Colors.amber,
       Colors.purple,
       Colors.orange,
       Colors.teal,
       Colors.pink,
-      Colors.amber,
+      Colors.green,
     ];
     return colors[index % colors.length];
   }
 
-  void _deleteRoute({required String routeName}) {
+  void _deleteRoute({required String routeName}) async {
     try {
       User? user = FirebaseAuth.instance.currentUser;
 
       if (user != null) {
         String userID = user.uid;
+
+        // Step 1: Get the user's document to fetch the routeIds
         DocumentReference userRef =
             FirebaseFirestore.instance.collection('users').doc(userID);
+        // DocumentSnapshot userSnapshot = await userRef.get();
+        // List<dynamic> routeIds = userSnapshot.get('routeIds') ?? [];
 
-        userRef.update({
-          'routes':
-              Provider.of<RouteProvider>(context, listen: false).userRoutes
-        });
+        // Step 2: Find the route in the 'routes' collection based on the routeName
+        QuerySnapshot routeQuery = await FirebaseFirestore.instance
+            .collection('routes')
+            .where('routeName', isEqualTo: routeName)
+            .get();
+
+        if (routeQuery.docs.isNotEmpty) {
+          String routeId = routeQuery.docs.first.id;
+
+          // Step 3: Delete the route from the 'routes' collection
+          await FirebaseFirestore.instance
+              .collection('routes')
+              .doc(routeId)
+              .delete();
+
+          // Step 4: Remove the routeId from the user's document
+          await userRef.update({
+            'routeIds': FieldValue.arrayRemove([routeId]),
+          });
+
+          debugPrint('Route deleted successfully.');
+        } else {
+          debugPrint('Route not found in the routes collection.');
+        }
       } else {
-        // print('User is not authenticated.');
+        debugPrint('User is not authenticated.');
       }
     } catch (e) {
-      // print('Error deleting route: $e');
+      debugPrint('Error deleting route: $e');
 
       showDialog(
         context: context,
@@ -341,15 +428,15 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
           actions: <Widget>[
             TextButton(
               onPressed: () {
-                Navigator.of(context).pop(urlController.text);
-              },
-              child: const Text('Import'),
-            ),
-            TextButton(
-              onPressed: () {
                 Navigator.of(context).pop(null);
               },
               child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(urlController.text);
+              },
+              child: const Text('Import'),
             ),
           ],
         );
@@ -368,7 +455,7 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
           }
 
           // Add the route data to Firestore
-          _addRouteToFirestore(routeData);
+          addImportedRouteToFirebase(routeData);
 
           // Show success dialog
           if (context.mounted) {
@@ -417,79 +504,118 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
     }
   }
 
-  Future<void> _addRouteToFirestore(Map<String, dynamic> routeData) async {
-    User? user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      String userID = user.uid;
-      DocumentReference userRef =
-          FirebaseFirestore.instance.collection('users').doc(userID);
-
-      // Fetch the current routes
-      DocumentSnapshot userSnapshot = await userRef.get();
-      List<dynamic> routes = userSnapshot['routes'];
-
-      // Check if the route already exists
-      if (routes.any((route) => route['routeName'] == routeData['routeName'])) {
-        throw Exception('Route with the same name already exists');
-      }
-
-      // Add the new route to the routes list
-      routes.add(routeData);
-
-      // Update the user document with the updated routes
-      await userRef.update({'routes': routes});
-    }
-  }
-
   void cancelLocationSubscription() {
     locationStreamSubscription.cancel();
   }
 
-  Future<void> getNextStop(List<LatLng> stops) async {
-    List<LatLng> routeStops = [...stops];
+  Future<void> getNextStop(List<LatLng> stops, String rtName) async {
+    List<LatLng> routeStops = List.from(stops);
     location.enableBackgroundMode(enable: true);
 
+    QuerySnapshot routeQuery = await FirebaseFirestore.instance
+        .collection('routes')
+        .where('routeName', isEqualTo: rtName)
+        .get();
+
+    final routeId = routeQuery.docs.first.id;
+
     locationStreamSubscription.onData((userLocation) async {
+      await saveUserLocationToFirebase(
+          LatLng(userLocation.latitude!, userLocation.longitude!), routeId);
       double minDistance = double.infinity;
       int index = 0;
 
+      debugPrint(
+          'apk: Current user location: (${userLocation.latitude}, ${userLocation.longitude})');
+      await FlutterOverlayWindow.shareData(
+        {
+          'routeId': routeId,
+          'nextStop':
+              'User Location: ${userLocation.latitude}, ${userLocation.longitude}',
+        },
+      );
+
+      // Calculate the nearest stop
       for (int i = 0; i < routeStops.length; i++) {
         double distance = calculateDistance(
             LatLng(userLocation.latitude!, userLocation.longitude!),
             routeStops[i]);
+
+        debugPrint('apk: Calculated distance to stop ${i + 1}: $distance');
+        await FlutterOverlayWindow.shareData({
+          'routeId': routeId,
+          'nextStop': 'Distance to Stop ${i + 1}: $distance',
+        });
+
         if (distance < minDistance) {
           index = i;
           minDistance = distance;
         }
       }
+
       LatLng nearestStop = routeStops[index];
       routeStops.removeAt(index);
       routeStops.insert(0, nearestStop);
 
+      // Fetch the nearest stop name
       if (routeStops.isNotEmpty) {
         String? locationName =
             await getPlaceName(routeStops[0].latitude, routeStops[0].longitude);
+        debugPrint('apk: locationName from outside is: $locationName');
+        // Send nearest stop info
+        await FlutterOverlayWindow.shareData({
+          'routeId': routeId,
+          'nextStop': 'Nearest Stop: $locationName',
+        });
+
         if (nextStop != locationName) {
           nextStop = locationName!;
-          await FlutterOverlayWindow.shareData(locationName);
+          debugPrint('apk: Updated nearest stop: $locationName');
+          // Send updated next stop
+          await FlutterOverlayWindow.shareData({
+            'routeId': routeId,
+            'nextStop': 'Next Stop: $locationName',
+          });
         }
       }
+
+      // Define the boundaries for the current stop
       double stopMinLatitude = routeStops[0].latitude - 0.002;
       double stopMaxLatitude = routeStops[0].latitude + 0.002;
       double stopMinLongitude = routeStops[0].longitude - 0.002;
       double stopMaxLongitude = routeStops[0].longitude + 0.002;
+
+      debugPrint(
+          'apk: Stop boundaries - Lat: [$stopMinLatitude, $stopMaxLatitude], Lon: [$stopMinLongitude, $stopMaxLongitude]');
+      // await FlutterOverlayWindow.shareData(
+      //     'Stop Boundaries: Lat [$stopMinLatitude, $stopMaxLatitude], Lon [$stopMinLongitude, $stopMaxLongitude]');
+
+      // Check if user has reached the stop
       if (stop < stops.length &&
           stopMinLongitude <= userLocation.longitude! &&
           userLocation.longitude! <= stopMaxLongitude &&
           stopMinLatitude <= userLocation.latitude! &&
           userLocation.latitude! <= stopMaxLatitude) {
         stop++;
+        debugPrint('apk: Stop reached, moving to next stop: $stop');
+        // Send stop reached message
+        await FlutterOverlayWindow.shareData({
+          'routeId': routeId,
+          'nextStop': 'Stop Reached, Moving to Next Stop: $stop',
+        });
+
         if (stop == stops.length) {
           nextStop = 'Reached';
-          await FlutterOverlayWindow.shareData(nextStop);
+          // Send final stop reached message
+          await FlutterOverlayWindow.shareData({
+            'routeId': routeId,
+            'nextStop': 'Final Stop: Reached',
+          });
           cancelLocationSubscription();
           return;
         }
+
+        // Reset for next nearest stop calculation
         index = 0;
         minDistance = double.infinity;
         routeStops.removeAt(0);
@@ -689,6 +815,33 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
   }
 
   @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // This method is called when the app state changes (resumed, paused, etc.)
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // User returned from Google Maps, cancel navigation and overlay
+      // cancelNavigation();
+    }
+  }
+
+  // void cancelNavigation() async {
+  //   // ScaffoldMessenger.of(context).showSnackBar(
+  //   //   const SnackBar(
+  //   //     content: Text('Navigation Cancelled'),
+  //   //   ),
+  //   // );
+  //   // Cancel the location stream subscription if it's active
+  //   await locationStreamSubscription.cancel();
+  //   // Close or hide the overlay window
+  //   await FlutterOverlayWindow.closeOverlay();
+  // }
+
+  @override
   Widget build(BuildContext context) {
     return StreamBuilder<LocationData>(
         stream: location.onLocationChanged,
@@ -722,70 +875,12 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
             ),
           );
           return Scaffold(
-            drawer: Drawer(
-              surfaceTintColor: Colors.amber,
-              width: 250,
-              backgroundColor: Colors.amber.shade200,
-              shadowColor: Colors.cyan,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                mainAxisAlignment: MainAxisAlignment.start,
-                children: [
-                  Container(
-                    height: MediaQuery.of(context).size.height * 0.3,
-                    color: Colors.amber,
-                    child: const Center(
-                      child: FlutterLogo(
-                        size: 45,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Consumer<UserInfoProvider>(
-                      builder: (context, userInfoProvider, child) {
-                    return Text('Name: ${userInfoProvider.userName}');
-                  }),
-                  const SizedBox(height: 10),
-                  Consumer<UserInfoProvider>(
-                      builder: (context, userInfoProvider, child) {
-                    return Text(
-                        'Date of Birth: ${userInfoProvider.dateOfBirth}');
-                  }),
-                  const SizedBox(height: 10),
-                  Consumer<UserInfoProvider>(
-                      builder: (context, userInfoProvider, child) {
-                    return Text(
-                        'Phone Number: ${userInfoProvider.phoneNumber}');
-                  }),
-                  const Spacer(),
-                  ElevatedButton.icon(
-                    onPressed: _importRoute,
-                    icon: const Icon(Icons.upload_file),
-                    label: const Text('Import Route'),
-                  ),
-                  const SizedBox(height: 10),
-                  ElevatedButton.icon(
-                    onPressed: () async {
-                      await _clearPreferences();
-                      if (context.mounted) {
-                        Navigator.pushAndRemoveUntil(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => PhoneAuthScreen()),
-                          (Route<dynamic> route) => false,
-                        );
-                      }
-                    },
-                    icon: const Icon(Icons.logout_rounded),
-                    label: const Text('Logout'),
-                  ),
-                  const SizedBox(height: 20),
-                ],
-              ),
-            ),
+            drawer: showDrawer(context),
             appBar: AppBar(
+              foregroundColor: Colors.white,
+              backgroundColor: Colors.green,
               title: const Text(
-                'Driver App',
+                'Trip Planner',
                 style: TextStyle(
                   color: Colors.white,
                 ),
@@ -829,7 +924,6 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
                   },
                 ),
               ],
-              backgroundColor: Colors.amber,
             ),
             body: FutureBuilder<void>(
               future: futureList,
@@ -864,304 +958,24 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
                     return Column(
                       children: [
                         loadingProvider.allRoutesScreenFilter
-                            ? SizedBox(
-                                height: 200,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: [
-                                    Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.center,
-                                      children: [
-                                        FilterItem(
-                                          label: 'By Date',
-                                          onTapped: _dateFilter,
-                                        ),
-                                        const FilterItem(
-                                            label: 'By Time', onTapped: null),
-                                        const Spacer(),
-                                        IconButton(
-                                            onPressed: () {
-                                              loadingProvider
-                                                  .changeAllRoutesScreenToggleState(
-                                                      !loadingProvider
-                                                          .allRoutesScreenFilter);
-                                              Provider.of<FiltersProvider>(
-                                                      context,
-                                                      listen: false)
-                                                  .stopsIncluded = [];
-                                              setState(() {
-                                                stopsFilter = false;
-                                              });
-                                              Provider.of<FiltersProvider>(
-                                                      context,
-                                                      listen: false)
-                                                  .filterDate = null;
-                                            },
-                                            icon: const Icon(
-                                              Icons.cancel,
-                                            )),
-                                      ],
-                                    ),
-                                    Expanded(
-                                      child: FutureBuilder(
-                                          future: _stopsFilter(
-                                              filtersProvider.stopsIncluded),
-                                          builder: (context, snapshot) {
-                                            if (snapshot.connectionState ==
-                                                ConnectionState.waiting) {
-                                              return Center(
-                                                child: AnimatedTextKit(
-                                                  animatedTexts: [
-                                                    TyperAnimatedText(
-                                                        'Getting location name....'),
-                                                  ],
-                                                ),
-                                              );
-                                            }
-                                            return ReorderableListView.builder(
-                                              itemCount: filtersProvider
-                                                  .stopsIncluded!.length,
-                                              itemBuilder:
-                                                  (BuildContext context,
-                                                      int index) {
-                                                return Padding(
-                                                  key: ValueKey(index),
-                                                  padding:
-                                                      const EdgeInsets.only(
-                                                    top: 8.0,
-                                                    left: 10,
-                                                  ),
-                                                  child: SingleChildScrollView(
-                                                    scrollDirection:
-                                                        Axis.horizontal,
-                                                    child: SizedBox(
-                                                      width:
-                                                          MediaQuery.of(context)
-                                                              .size
-                                                              .width,
-                                                      child: Row(
-                                                        children: [
-                                                          const Icon(
-                                                              Icons.reorder),
-                                                          const SizedBox(
-                                                            width: 5,
-                                                          ),
-                                                          Expanded(
-                                                            child: TextField(
-                                                              readOnly: true,
-                                                              controller:
-                                                                  filterStopsController[
-                                                                      index],
-                                                              decoration:
-                                                                  InputDecoration(
-                                                                border:
-                                                                    const OutlineInputBorder(),
-                                                                suffixIcon:
-                                                                    IconButton(
-                                                                  onPressed:
-                                                                      () {},
-                                                                  icon: const Icon(
-                                                                      Icons
-                                                                          .gps_not_fixed),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                          ),
-                                                          const SizedBox(
-                                                            width: 2,
-                                                          ),
-                                                          IconButton(
-                                                            onPressed: () {
-                                                              filtersProvider
-                                                                  .excludeStop(
-                                                                      index);
-                                                            },
-                                                            icon: const Icon(Icons
-                                                                .remove_circle),
-                                                          ),
-                                                          const SizedBox(
-                                                            width: 10,
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                  ),
-                                                );
-                                              },
-                                              onReorder:
-                                                  (int oldIndex, int newIndex) {
-                                                if (oldIndex < newIndex) {
-                                                  newIndex--;
-                                                }
-                                                filtersProvider.stopsIncluded!
-                                                    .insert(
-                                                        newIndex,
-                                                        filtersProvider
-                                                            .stopsIncluded!
-                                                            .removeAt(
-                                                                oldIndex));
-                                              },
-                                            );
-                                          }),
-                                    ),
-                                    ElevatedButton(
-                                      onPressed: () async {
-                                        List<dynamic> selectedStop =
-                                            await Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (ctx) =>
-                                                RouteAddStopScreen(
-                                              currentLocationData:
-                                                  currentLocation.data!,
-                                              displayedUserAddedStops:
-                                                  routeProvider.userStops,
-                                            ),
-                                          ),
-                                        );
-                                        filtersProvider.includedStops(
-                                            selectedStop[1] as osm.GeoPoint);
-                                      },
-                                      child: const Text('Add Stop'),
-                                    ),
-                                  ],
-                                ),
-                              )
+                            ? showsearchFilterScreen(loadingProvider, context,
+                                filtersProvider, currentLocation, routeProvider)
                             : const SizedBox.shrink(),
-                        SizedBox(
-                          height: 25,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: allTagsList.length,
-                            itemBuilder: (ctx, index) {
-                              return Row(
-                                mainAxisAlignment: MainAxisAlignment.start,
-                                children: [
-                                  Checkbox(
-                                    value: isSelected[index],
-                                    onChanged: (isChecked) {
-                                      if (isChecked!) {
-                                        if (allTagsList[index] == 'All') {
-                                          setState(() {
-                                            selectedTags = ['All'];
-                                          });
-                                        } else {
-                                          selectedTags.add(allTagsList[index]);
-                                        }
-                                        setState(() {
-                                          isSelected[index] = isChecked;
-                                        });
-                                      } else {
-                                        setState(() {
-                                          isSelected[index] = isChecked;
-                                          selectedTags
-                                              .remove(allTagsList[index]);
-                                        });
-                                      }
-                                      int count = 0;
-                                      List<LatLng?> initialCenterList =
-                                          filteredRouteStopsMap.isEmpty
-                                              ? []
-                                              : selectedTags.isEmpty
-                                                  ? [
-                                                      LatLng(
-                                                          currentLocation
-                                                              .data!.latitude!,
-                                                          currentLocation
-                                                              .data!.longitude!)
-                                                    ]
-                                                  : filteredRouteStopsMap
-                                                      .entries
-                                                      .map((e) {
-                                                      if (e.key.trim() ==
-                                                          selectedTags[0]
-                                                              .trim()) {
-                                                        if (count == 0) {
-                                                          return filteredRouteStopsMap[
-                                                              e.key]?[0];
-                                                        }
-                                                        count++;
-                                                      }
-                                                    }).toList();
-                                      count = 0;
-                                      if (initialCenterList[0] != null) {
-                                        initialCenter = initialCenterList[0];
-                                        setState(() {
-                                          flutterMapController.move(
-                                              initialCenterList[0]!, 14);
-                                        });
-                                      } else {
-                                        if (routeProvider
-                                            .userStops.isNotEmpty) {
-                                          routeProvider.userStops.map((value) {
-                                            if (value['tags']
-                                                    .toString()
-                                                    .trim() ==
-                                                selectedTags[0].trim()) {
-                                              if (count == 0) {
-                                                value.entries.map((e) async {
-                                                  initialCenter =
-                                                      value['point'];
-                                                  setState(() {
-                                                    flutterMapController.move(
-                                                        initialCenter!, 14);
-                                                  });
-                                                }).toList();
-                                              }
-                                              count++;
-                                            }
-                                            count = 0;
-                                          }).toList();
-                                        }
-                                      }
-                                    },
-                                  ),
-                                  Text(allTagsList[index]),
-                                ],
-                              );
-                            },
-                          ),
-                        ),
+                        showFiltersCheckList(
+                            currentLocation, initialCenter, routeProvider),
                         Expanded(
                           flex: 6,
-                          child:
-                              // FutureBuilder(
-                              //                       future: getLocation,
-                              //                       builder: (context, snapshot) {
-                              //                         if (snapshot.connectionState ==
-                              //                             ConnectionState.waiting) {
-                              //                           return Center(
-                              //                             child: AnimatedTextKit(
-                              //                               repeatForever: true,
-                              //                               isRepeatingAnimation: true,
-                              //                               animatedTexts: [
-                              //                                 TyperAnimatedText(
-                              //                                     'We are getting your location ...',
-                              //                                     textStyle: const TextStyle(fontSize: 18)),
-                              //                                 TyperAnimatedText('Please wait....',
-                              //                                     textStyle: const TextStyle(fontSize: 18)),
-                              //                                 TyperAnimatedText(
-                              //                                     'Sorry, for the inconvenience.',
-                              //                                     textStyle: const TextStyle(fontSize: 18)),
-                              //                               ],
-                              //                             ),
-                              //                           );
-                              //                         }
-                              Stack(
+                          child: Stack(
                             children: [
                               Consumer<RouteProvider>(
                                   builder: (context, routeProvider, child) {
                                 return FlutterMap(
                                   mapController: flutterMapController,
                                   options: MapOptions(
-                                    initialCenter: currentLocation != null
-                                        ? LatLng(
-                                            currentLocation.data!.latitude!,
-                                            currentLocation.data!.longitude!,
-                                          )
-                                        : const LatLng(9.75527985137314,
-                                            76.64998268216185),
+                                    initialCenter: LatLng(
+                                      currentLocation.data!.latitude!,
+                                      currentLocation.data!.longitude!,
+                                    ),
                                     initialZoom: 14.0,
                                   ),
                                   children: [
@@ -1188,12 +1002,11 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
                                           ),
                                         ],
                                       ),
-                                    if (routeProvider.userRoutes.isEmpty)
-                                      MarkerLayer(
-                                        markers: [
-                                          marker,
-                                        ],
-                                      ),
+                                    MarkerLayer(
+                                      markers: [
+                                        marker,
+                                      ],
+                                    ),
                                     if (routeProvider.userRoutes.isNotEmpty)
                                       for (var routeId
                                           in Provider.of<RouteProvider>(context,
@@ -1278,7 +1091,7 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
                                                 ],
                                               ),
                                             );
-                                          }).toList(),
+                                          }),
                                         ],
                                       ),
                                   ],
@@ -1321,7 +1134,7 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
                                               currentLocation.data!.latitude!,
                                               currentLocation.data!.longitude!,
                                             ),
-                                            14);
+                                            18);
                                         locationName = await getPlaceName(
                                             currentLocation.data!.latitude!,
                                             currentLocation.data!.longitude!);
@@ -1339,7 +1152,7 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
                                               ),
                                             )
                                           : const Icon(
-                                              Icons.location_searching,
+                                              Icons.my_location_rounded,
                                             ),
                                     );
                                   },
@@ -1395,22 +1208,26 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
                                   }
                                   LatLng? initialPoint;
                                   return ListTile(
-                                    title: Row(
-                                      children: [
-                                        Text(
-                                          routeName,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
+                                    title: SingleChildScrollView(
+                                      scrollDirection: Axis.horizontal,
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            routeName,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                            ),
                                           ),
-                                        ),
-                                        const SizedBox(width: 5),
-                                        Text(
-                                          '(tags: $tags)',
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
+                                          const SizedBox(width: 5),
+                                          Text(
+                                            '(tags: $tags)',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                            ),
                                           ),
-                                        ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
                                     subtitle: Column(
                                       crossAxisAlignment:
@@ -1453,137 +1270,8 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
                                             14);
                                       });
                                     },
-                                    trailing: PopupMenuButton<String>(
-                                      elevation: 8,
-                                      onSelected: (String value) async {
-                                        if (value == 'edit') {
-                                          await Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) =>
-                                                  RouteEditScreen(
-                                                routeName: routeName,
-                                                currentLocationData:
-                                                    currentLocation.data!,
-                                                allTags: allTagsList,
-                                              ),
-                                            ),
-                                          );
-                                        } else if (value == 'duplicate') {
-                                          // Implement copy functionality
-
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) =>
-                                                  RouteCopyScreen(
-                                                routeName: routeName,
-                                              ),
-                                            ),
-                                          );
-                                        } else if (value == 'delete') {
-                                          // print('Oops!, lets delete this.');
-                                          // Implement delete functionality
-                                          showDialog(
-                                            context: context,
-                                            builder: (context) {
-                                              return AlertDialog(
-                                                title: const Text(
-                                                    'Confirm Deletion'),
-                                                content: Text(
-                                                    'Your route $routeName will be deleted. Do you want to continue?'),
-                                                actions: [
-                                                  TextButton(
-                                                    onPressed: () {
-                                                      Navigator.of(context)
-                                                          .pop(); // Close the dialog
-                                                    },
-                                                    child: const Text('Cancel'),
-                                                  ),
-                                                  TextButton(
-                                                    onPressed: () {
-                                                      Provider.of<
-                                                          RouteProvider>(
-                                                        context,
-                                                        listen: false,
-                                                      ).deleteRoute(routeName);
-                                                      _deleteRoute(
-                                                          routeName: routeName);
-                                                      Navigator.of(context)
-                                                          .pop();
-                                                    },
-                                                    child: const Text('Delete'),
-                                                  ),
-                                                ],
-                                              );
-                                            },
-                                          );
-                                        } else if (value == 'navigate') {
-                                          // print('lets navigate! ohoo');
-                                        } else if (value == 'share') {
-                                          // print('lets share it');
-                                          encodeAndShareRoute(routeName);
-                                        }
-                                      },
-                                      itemBuilder: (BuildContext context) =>
-                                          <PopupMenuEntry<String>>[
-                                        const PopupMenuItem<String>(
-                                          value: 'edit',
-                                          child: ListTile(
-                                            leading: Icon(Icons.edit),
-                                            title: Text('Edit'),
-                                          ),
-                                        ),
-                                        const PopupMenuItem<String>(
-                                          value: 'duplicate',
-                                          child: ListTile(
-                                            leading: Icon(Icons.copy),
-                                            title: Text('duplicate'),
-                                          ),
-                                        ),
-                                        const PopupMenuItem<String>(
-                                          value: 'delete',
-                                          child: ListTile(
-                                            leading: Icon(Icons.delete),
-                                            title: Text('Delete'),
-                                          ),
-                                        ),
-                                        PopupMenuItem(
-                                          value: 'navigate',
-                                          child: ListTile(
-                                            leading: const Icon(
-                                                Icons.navigation_rounded),
-                                            title: const Text('Navigate'),
-                                            onTap: () async {
-                                              List<LatLng> stops =
-                                                  filteredRouteStopsMap[
-                                                      routeName]!;
-                                              _startNavigation(stops);
-                                              // locationStreamSubscription =
-                                              //     location.onLocationChanged
-                                              //         .listen((event) {});
-                                              nextStop = 'Getting Location ...';
-                                              stop = 0;
-                                              FlutterOverlayWindow.showOverlay(
-                                                  height: 350, // 350
-                                                  width: 900,
-                                                  enableDrag: true);
-                                              await FlutterOverlayWindow
-                                                  .shareData(
-                                                      'Getting Location ...');
-                                              await getNextStop(stops);
-                                            },
-                                          ),
-                                        ),
-                                        const PopupMenuItem(
-                                          value: 'share',
-                                          child: ListTile(
-                                            leading: Icon(Icons.share),
-                                            title: Text('Share'),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                                    trailing: showMenuPopUp(
+                                        context, routeName, currentLocation),
                                     selected: selectedRouteId == routeName,
                                     tileColor: selectedRouteId == routeName
                                         ? Colors.grey
@@ -1706,112 +1394,539 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen> {
                 }
               },
             ),
-            floatingActionButton: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Consumer<LoadingProvider>(
-                  builder: (BuildContext context, value, Widget? child) {
-                    return FloatingActionButton(
-                      heroTag: null,
-                      backgroundColor: Colors.amber,
-                      onPressed: value.locationLoading
-                          ? () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: const Text(
-                                    'Getting your location',
-                                  ),
-                                  action: SnackBarAction(
-                                      label: 'Ok',
-                                      onPressed: ScaffoldMessenger.of(context)
-                                          .clearSnackBars),
-                                ),
-                              );
-                            }
-                          : () async {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => RouteCreationScreen(
-                                    selectedTags: selectedTags,
-                                    locationName: locationName,
-                                    currentLocationData: currentLocation.data!,
-                                    allTags: allTagsList,
-                                  ),
-                                ),
-                              );
-                            },
-                      child: value.locationLoading
-                          ? const Center(
-                              child: SizedBox(
-                                width: 25,
-                                height: 25,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                ),
-                              ),
-                            )
-                          : const Icon(
-                              Icons.add_road_sharp,
-                              color: Colors.white,
-                            ),
-                    );
-                  },
-                ),
-                const SizedBox(width: 16),
-                Consumer<LoadingProvider>(
-                  builder: (BuildContext context, LoadingProvider value,
-                      Widget? child) {
-                    return FloatingActionButton(
-                      heroTag: null,
-                      onPressed: value.locationLoading
-                          ? () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: const Text(
-                                    'Getting your location',
-                                  ),
-                                  action: SnackBarAction(
-                                      label: 'Ok',
-                                      onPressed: ScaffoldMessenger.of(context)
-                                          .clearSnackBars),
-                                ),
-                              );
-                            }
-                          : () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => AddStopScreen(
-                                    filteredTags: selectedTags,
-                                    allTags: allTagsList,
-                                    currentLocationData: currentLocation.data!,
-                                    locationName: locationName,
-                                  ),
-                                ),
-                              );
-                            },
-                      backgroundColor: Colors.amber,
-                      child: value.locationLoading
-                          ? const Center(
-                              child: SizedBox(
-                                width: 25,
-                                height: 25,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                ),
-                              ),
-                            )
-                          : const Icon(
-                              Icons.add_location_alt_outlined,
-                              color: Colors.white,
-                            ),
-                    );
-                  },
-                )
-              ],
+            floatingActionButton: FloatingActionButtonCustom(
+              selectedTags: selectedTags,
+              locationName: locationName,
+              allTagsList: allTagsList,
+              cl: currentLocation,
             ),
           );
         });
+  }
+
+  Drawer showDrawer(BuildContext context) {
+    return Drawer(
+      surfaceTintColor: Colors.green,
+      width: 250,
+      backgroundColor: Colors.green.shade200,
+      shadowColor: Colors.cyan,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
+          Container(
+            height: MediaQuery.of(context).size.height * 0.3,
+            color: Colors.green,
+            child: const Center(
+              child: FlutterLogo(
+                size: 45,
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Consumer<UserInfoProvider>(
+              builder: (context, userInfoProvider, child) {
+            return Text('Name: ${userInfoProvider.userName}');
+          }),
+          const SizedBox(height: 10),
+          Consumer<UserInfoProvider>(
+              builder: (context, userInfoProvider, child) {
+            return Text('Date of Birth: ${userInfoProvider.dateOfBirth}');
+          }),
+          const SizedBox(height: 10),
+          Consumer<UserInfoProvider>(
+              builder: (context, userInfoProvider, child) {
+            return Text('Phone Number: ${userInfoProvider.phoneNumber}');
+          }),
+          const Spacer(),
+          ElevatedButton.icon(
+            onPressed: _importRoute,
+            icon: const Icon(Icons.upload_file),
+            label: const Text('Import Route'),
+          ),
+          const SizedBox(height: 10),
+          ElevatedButton.icon(
+            onPressed: () async {
+              await _clearPreferences();
+              if (context.mounted) {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (context) => PhoneAuthScreen()),
+                  (Route<dynamic> route) => false,
+                );
+              }
+            },
+            icon: const Icon(Icons.logout_rounded),
+            label: const Text('Logout'),
+          ),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  PopupMenuButton<String> showMenuPopUp(BuildContext context, String routeName,
+      AsyncSnapshot<LocationData> currentLocation) {
+    return PopupMenuButton<String>(
+      elevation: 8,
+      onSelected: (String value) async {
+        if (value == 'edit') {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => RouteEditScreen(
+                routeName: routeName,
+                currentLocationData: currentLocation.data!,
+                allTags: allTagsList,
+              ),
+            ),
+          );
+        } else if (value == 'duplicate') {
+          // Implement copy functionality
+
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => RouteCopyScreen(
+                routeName: routeName,
+              ),
+            ),
+          );
+        } else if (value == 'delete') {
+          // print('Oops!, lets delete this.');
+          // Implement delete functionality
+          showDialog(
+            context: context,
+            builder: (context) {
+              return AlertDialog(
+                title: const Text('Confirm Deletion'),
+                content: Text(
+                    'Your route $routeName will be deleted. Do you want to continue?'),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop(); // Close the dialog
+                    },
+                    child: const Text('Cancel'),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      Provider.of<RouteProvider>(
+                        context,
+                        listen: false,
+                      ).deleteRoute(routeName);
+                      _deleteRoute(routeName: routeName);
+                      Navigator.of(context).pop();
+                    },
+                    child: const Text('Delete'),
+                  ),
+                ],
+              );
+            },
+          );
+        } else if (value == 'navigate') {
+          // print('lets navigate! ohoo');
+        } else if (value == 'share') {
+          // print('lets share it');
+          encodeAndShareRoute(routeName);
+        }
+      },
+      itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+        const PopupMenuItem<String>(
+          value: 'edit',
+          child: ListTile(
+            leading: Icon(Icons.edit),
+            title: Text('Edit'),
+          ),
+        ),
+        const PopupMenuItem<String>(
+          value: 'duplicate',
+          child: ListTile(
+            leading: Icon(Icons.copy),
+            title: Text('duplicate'),
+          ),
+        ),
+        const PopupMenuItem<String>(
+          value: 'delete',
+          child: ListTile(
+            leading: Icon(Icons.delete),
+            title: Text('Delete'),
+          ),
+        ),
+        PopupMenuItem(
+          value: 'navigate',
+          child: ListTile(
+            leading: const Icon(Icons.navigation_rounded),
+            title: const Text('Navigate'),
+            onTap: () async {
+              List<LatLng> stops = filteredRouteStopsMap[routeName]!;
+              _startNavigation(stops);
+              locationStreamSubscription =
+                  location.onLocationChanged.listen((event) {});
+              nextStop = 'Getting Location ...';
+              stop = 0;
+              FlutterOverlayWindow.showOverlay(
+                height: 400, // 350
+                width: 900,
+                enableDrag: true,
+                overlayTitle: routeName,
+              );
+              await FlutterOverlayWindow.shareData({
+                'routeId': null,
+                'nextStop': nextStop,
+              });
+              await getNextStop(stops, routeName);
+            },
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'share',
+          child: ListTile(
+            leading: Icon(Icons.share),
+            title: Text('Share'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  SizedBox showFiltersCheckList(AsyncSnapshot<LocationData> currentLocation,
+      LatLng? initialCenter, RouteProvider routeProvider) {
+    return SizedBox(
+      height: 25,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: allTagsList.length,
+        itemBuilder: (ctx, index) {
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.start,
+            children: [
+              Checkbox(
+                value: isSelected[index],
+                onChanged: (isChecked) {
+                  if (isChecked!) {
+                    if (allTagsList[index] == 'All') {
+                      setState(() {
+                        selectedTags = ['All'];
+                      });
+                    } else {
+                      selectedTags.add(allTagsList[index]);
+                    }
+                    setState(() {
+                      isSelected[index] = isChecked;
+                    });
+                  } else {
+                    setState(() {
+                      isSelected[index] = isChecked;
+                      selectedTags.remove(allTagsList[index]);
+                    });
+                  }
+                  int count = 0;
+                  List<LatLng?> initialCenterList =
+                      filteredRouteStopsMap.isEmpty
+                          ? []
+                          : selectedTags.isEmpty
+                              ? [
+                                  LatLng(currentLocation.data!.latitude!,
+                                      currentLocation.data!.longitude!)
+                                ]
+                              : filteredRouteStopsMap.entries.map((e) {
+                                  if (e.key.trim() == selectedTags[0].trim()) {
+                                    if (count == 0) {
+                                      return filteredRouteStopsMap[e.key]?[0];
+                                    }
+                                    count++;
+                                  }
+                                }).toList();
+                  count = 0;
+                  if (initialCenterList[0] != null) {
+                    initialCenter = initialCenterList[0];
+                    setState(() {
+                      flutterMapController.move(initialCenterList[0]!, 14);
+                    });
+                  } else {
+                    if (routeProvider.userStops.isNotEmpty) {
+                      routeProvider.userStops.map((value) {
+                        if (value['tags'].toString().trim() ==
+                            selectedTags[0].trim()) {
+                          if (count == 0) {
+                            value.entries.map((e) async {
+                              initialCenter = value['point'];
+                              setState(() {
+                                flutterMapController.move(initialCenter!, 14);
+                              });
+                            }).toList();
+                          }
+                          count++;
+                        }
+                        count = 0;
+                      }).toList();
+                    }
+                  }
+                },
+              ),
+              Text(allTagsList[index]),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  SizedBox showsearchFilterScreen(
+      LoadingProvider loadingProvider,
+      BuildContext context,
+      FiltersProvider filtersProvider,
+      AsyncSnapshot<LocationData> currentLocation,
+      RouteProvider routeProvider) {
+    return SizedBox(
+      height: 200,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              FilterItem(
+                label: 'By Date',
+                onTapped: _dateFilter,
+              ),
+              const FilterItem(label: 'By Time', onTapped: null),
+              const Spacer(),
+              IconButton(
+                  onPressed: () {
+                    loadingProvider.changeAllRoutesScreenToggleState(
+                        !loadingProvider.allRoutesScreenFilter);
+                    Provider.of<FiltersProvider>(context, listen: false)
+                        .stopsIncluded = [];
+                    setState(() {
+                      stopsFilter = false;
+                    });
+                    Provider.of<FiltersProvider>(context, listen: false)
+                        .filterDate = null;
+                  },
+                  icon: const Icon(
+                    Icons.cancel,
+                  )),
+            ],
+          ),
+          Expanded(
+            child: FutureBuilder(
+                future: _stopsFilter(filtersProvider.stopsIncluded),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return Center(
+                      child: AnimatedTextKit(
+                        animatedTexts: [
+                          TyperAnimatedText('Getting location name....'),
+                        ],
+                      ),
+                    );
+                  }
+                  return ReorderableListView.builder(
+                    itemCount: filtersProvider.stopsIncluded!.length,
+                    itemBuilder: (BuildContext context, int index) {
+                      return Padding(
+                        key: ValueKey(index),
+                        padding: const EdgeInsets.only(
+                          top: 8.0,
+                          left: 10,
+                        ),
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: SizedBox(
+                            width: MediaQuery.of(context).size.width,
+                            child: Row(
+                              children: [
+                                const Icon(Icons.reorder),
+                                const SizedBox(
+                                  width: 5,
+                                ),
+                                Expanded(
+                                  child: TextField(
+                                    readOnly: true,
+                                    controller: filterStopsController[index],
+                                    decoration: InputDecoration(
+                                      border: const OutlineInputBorder(),
+                                      suffixIcon: IconButton(
+                                        onPressed: () {},
+                                        icon: const Icon(Icons.gps_not_fixed),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(
+                                  width: 2,
+                                ),
+                                IconButton(
+                                  onPressed: () {
+                                    filtersProvider.excludeStop(index);
+                                  },
+                                  icon: const Icon(Icons.remove_circle),
+                                ),
+                                const SizedBox(
+                                  width: 10,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                    onReorder: (int oldIndex, int newIndex) {
+                      if (oldIndex < newIndex) {
+                        newIndex--;
+                      }
+                      filtersProvider.stopsIncluded!.insert(newIndex,
+                          filtersProvider.stopsIncluded!.removeAt(oldIndex));
+                    },
+                  );
+                }),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              List<dynamic> selectedStop = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (ctx) => RouteAddStopScreen(
+                    currentLocationData: currentLocation.data!,
+                    displayedUserAddedStops: routeProvider.userStops,
+                  ),
+                ),
+              );
+              filtersProvider.includedStops(selectedStop[1] as osm.GeoPoint);
+            },
+            child: const Text('search by stop'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class FloatingActionButtonCustom extends StatelessWidget {
+  const FloatingActionButtonCustom({
+    super.key,
+    required this.selectedTags,
+    required this.locationName,
+    required this.allTagsList,
+    required this.cl,
+  });
+
+  final List<String> selectedTags;
+  final String? locationName;
+  final List<String> allTagsList;
+  final AsyncSnapshot<LocationData> cl;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        Consumer<LoadingProvider>(
+          builder: (BuildContext context, value, Widget? child) {
+            return FloatingActionButton(
+              heroTag: null,
+              mini: true,
+              backgroundColor: Colors.green,
+              onPressed: value.locationLoading
+                  ? () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Text(
+                            'Getting your location',
+                          ),
+                          action: SnackBarAction(
+                              label: 'Ok',
+                              onPressed:
+                                  ScaffoldMessenger.of(context).clearSnackBars),
+                        ),
+                      );
+                    }
+                  : () async {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => RouteCreationScreen(
+                            selectedTags: selectedTags,
+                            locationName: locationName,
+                            currentLocationData: cl.data!,
+                            allTags: allTagsList,
+                          ),
+                        ),
+                      );
+                    },
+              child: value.locationLoading
+                  ? const Center(
+                      child: SizedBox(
+                        width: 15,
+                        height: 15,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                        ),
+                      ),
+                    )
+                  : const Icon(
+                      Icons.add_road_sharp,
+                      color: Colors.white,
+                    ),
+            );
+          },
+        ),
+        const SizedBox(width: 16),
+        Consumer<LoadingProvider>(
+          builder:
+              (BuildContext context, LoadingProvider value, Widget? child) {
+            return FloatingActionButton(
+              heroTag: null,
+              mini: true,
+              onPressed: value.locationLoading
+                  ? () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Text(
+                            'Getting your location',
+                          ),
+                          action: SnackBarAction(
+                            label: 'Ok',
+                            onPressed:
+                                ScaffoldMessenger.of(context).clearSnackBars,
+                          ),
+                        ),
+                      );
+                    }
+                  : () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => AddStopScreen(
+                            filteredTags: selectedTags,
+                            allTags: allTagsList,
+                            currentLocationData: cl.data!,
+                            locationName: locationName,
+                          ),
+                        ),
+                      );
+                    },
+              backgroundColor: Colors.green,
+              child: value.locationLoading
+                  ? const Center(
+                      child: SizedBox(
+                        width: 15,
+                        height: 15,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                        ),
+                      ),
+                    )
+                  : const Icon(
+                      Icons.add_location_alt_outlined,
+                      color: Colors.white,
+                    ),
+            );
+          },
+        )
+      ],
+    );
   }
 }

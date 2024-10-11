@@ -4,9 +4,11 @@ class DeleteStopScreen extends StatefulWidget {
   final List<String> stops;
   final Function(String) onDeleteStop;
 
-  const DeleteStopScreen(
-      {required this.stops, required this.onDeleteStop, Key? key})
-      : super(key: key);
+  const DeleteStopScreen({
+    super.key,
+    required this.stops,
+    required this.onDeleteStop,
+  });
 
   @override
   _DeleteStopScreenState createState() => _DeleteStopScreenState();
@@ -17,7 +19,9 @@ class _DeleteStopScreenState extends State<DeleteStopScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Delete Stop'),
+        foregroundColor: Colors.white,
+        backgroundColor: Colors.green,
+        title: const Text('Delete Stop'),
       ),
       body: ListView.builder(
         itemCount: widget.stops.length,
@@ -26,7 +30,7 @@ class _DeleteStopScreenState extends State<DeleteStopScreen> {
           return ListTile(
             title: Text(stop),
             trailing: IconButton(
-              icon: Icon(Icons.delete),
+              icon: const Icon(Icons.delete),
               onPressed: () {
                 widget.onDeleteStop(stop);
                 setState(() {

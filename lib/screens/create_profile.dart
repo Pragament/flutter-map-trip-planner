@@ -5,7 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class ProfileCreationScreen extends StatefulWidget {
   final String phoneNumber;
 
-  ProfileCreationScreen(this.phoneNumber, {super.key});
+  const ProfileCreationScreen(this.phoneNumber, {super.key});
 
   @override
   State<ProfileCreationScreen> createState() => _ProfileCreationScreenState();
@@ -76,14 +76,13 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
+      appBar: AppBar( foregroundColor:Colors.white, backgroundColor:Colors.green,
         title: const Text(
           'Create Profile',
           style: TextStyle(
             color: Colors.white,
           ),
         ),
-        backgroundColor: Colors.amber,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -129,7 +128,7 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
                   },
                   child: const Icon(
                     Icons.calendar_today,
-                    color: Colors.amber,
+                    color: Colors.green,
                   ),
                 ),
               ),

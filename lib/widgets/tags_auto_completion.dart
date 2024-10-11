@@ -3,16 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:textfield_tags/textfield_tags.dart';
 
 class TagsAutoCompletion extends StatelessWidget {
-  TagsAutoCompletion({
+  const TagsAutoCompletion({
     required this.textfieldTagsController,
     required this.allTags,
     required this.displayTags,
     super.key,
   });
 
-  TextfieldTagsController textfieldTagsController;
-  List<String>? allTags;
-  List<String> displayTags;
+  final TextfieldTagsController textfieldTagsController;
+  final List<String>? allTags;
+  final List<String> displayTags;
 
   @override
   Widget build(BuildContext context) {
@@ -104,15 +104,19 @@ class TagsAutoCompletion extends StatelessWidget {
                                         ),
                                         color: Color.fromARGB(255, 74, 137, 92),
                                       ),
-                                      margin: const EdgeInsets.only(right: 10.0),
-                                      padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
+                                      margin:
+                                          const EdgeInsets.only(right: 10.0),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10.0, vertical: 4.0),
                                       child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
                                         children: [
                                           InkWell(
                                             child: Text(
                                               '#${textFieldTagValues.tags.elementAt(index)}',
-                                              style: const TextStyle(color: Colors.white),
+                                              style: const TextStyle(
+                                                  color: Colors.white),
                                             ),
                                             onTap: () {
                                               //print("$tag selected");
@@ -123,10 +127,13 @@ class TagsAutoCompletion extends StatelessWidget {
                                             child: const Icon(
                                               Icons.cancel,
                                               size: 14.0,
-                                              color: Color.fromARGB(255, 233, 233, 233),
+                                              color: Color.fromARGB(
+                                                  255, 233, 233, 233),
                                             ),
                                             onTap: () {
-                                              textFieldTagValues.onTagDelete(textFieldTagValues.tags.elementAt(index));
+                                              textFieldTagValues.onTagDelete(
+                                                  textFieldTagValues.tags
+                                                      .elementAt(index));
                                             },
                                           )
                                         ],

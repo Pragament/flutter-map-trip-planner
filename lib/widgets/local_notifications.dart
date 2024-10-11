@@ -31,8 +31,9 @@ class LocalNotifications {
     required String payload,
   }) async {
     const AndroidNotificationDetails androidNotificationDetails =
-        AndroidNotificationDetails('your channel id', 'your channel name',
-            channelDescription: 'your channel description',
+        AndroidNotificationDetails('1', 'Sample Channel',
+            channelDescription:
+                'This is the channel we use to test notifications.',
             importance: Importance.max,
             priority: Priority.high,
             ticker: 'ticker');
@@ -49,8 +50,9 @@ class LocalNotifications {
     required String payload,
   }) async {
     const AndroidNotificationDetails androidNotificationDetails =
-        AndroidNotificationDetails('your channel id', 'your channel name',
-            channelDescription: 'your channel description',
+        AndroidNotificationDetails('-1', 'Periodic Channel',
+            channelDescription:
+                'This is the channel we use to send periodic notifications.',
             importance: Importance.max,
             priority: Priority.high,
             ticker: 'ticker');

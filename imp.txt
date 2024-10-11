@@ -1,0 +1,2 @@
+we have to host the assetlinks.json in <webdomain>/.well-known/assetlinks.json in order to activate deep links.
+keytool -list -v -keystore "C:\Users\username["Replace with your uername"]\.android\debug.keystore" -alias androiddebugkey -storepass android -keypass android

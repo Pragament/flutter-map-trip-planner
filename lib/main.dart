@@ -1,28 +1,28 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter_map_trip_planner/providers/location_provider.dart';
-import 'package:flutter/material.dart';
-
-import 'package:flutter_overlay_window/flutter_overlay_window.dart';
+// import 'package:app_links/app_links.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:permission_handler/permission_handler.dart';
-
+import 'package:flutter/material.dart';
 import 'package:flutter_map_trip_planner/providers/filters_provider.dart';
+import 'package:flutter_map_trip_planner/providers/loading_provider.dart';
+import 'package:flutter_map_trip_planner/providers/location_provider.dart';
 import 'package:flutter_map_trip_planner/providers/route_provider.dart';
 import 'package:flutter_map_trip_planner/providers/user_info_provider.dart';
+// import 'package:flutter_map_trip_planner/route_details_fetcher.dart';
+import 'package:flutter_map_trip_planner/screens/all_routes.dart';
+import 'package:flutter_map_trip_planner/screens/login.dart';
+import 'package:flutter_map_trip_planner/screens/overlay_layout.dart';
+import 'package:flutter_map_trip_planner/screens/route_display_screen.dart';
+import 'package:flutter_map_trip_planner/widgets/local_notifications.dart';
+import 'package:flutter_map_trip_planner/widgets/route_table.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import 'firebase_options.dart';
-import 'package:flutter_map_trip_planner/providers/loading_provider.dart';
-import 'package:flutter_map_trip_planner/screens/overlay.dart';
-import 'screens/login.dart';
-import 'widgets/local_notifications.dart';
-import 'widgets/route_table.dart';
-import 'screens/all_routes.dart';
-import 'screens/route_display_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -45,7 +45,7 @@ void main() async {
 
   // Function to send notification if nearest date is today
   void sendNotificationIfNearestDateIsToday() {
-    print('Checking');
+    debugPrint('Checking');
     DateTime now = DateTime.now();
     DateTime nearestDate = DateTime(9999);
     Map<String, dynamic>? nearestRouteData;
@@ -90,9 +90,9 @@ void main() async {
     }
   }
 
-  if (!await FlutterOverlayWindow.isPermissionGranted()) {
-    await FlutterOverlayWindow.requestPermission();
-  }
+  // if (!await FlutterOverlayWindow.isPermissionGranted()) {
+  //   await FlutterOverlayWindow.requestPermission();
+  // }
 
   runApp(
     MyApp(isSignedInWithin5Days, routes),
@@ -103,52 +103,65 @@ void main() async {
 void overlayMain() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(
-    MaterialApp(
+    const MaterialApp(
       debugShowCheckedModeBanner: false,
       home: Material(
-        color: Colors.yellow[200], // teal, green, blue, deepPurple
-        child: const Column(
-          mainAxisAlignment: MainAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Padding(
-                  padding: EdgeInsets.only(left: 10.0),
-                  child: Text(
-                    'Nearest Stop :',
-                    style: TextStyle(fontSize: 19, fontWeight: FontWeight.w600),
-                  ),
-                ),
-                IconButton(
-                  onPressed: FlutterOverlayWindow.closeOverlay,
-                  icon: Icon(
-                    Icons.cancel_rounded,
-                    size: 25,
-                  ),
-                ),
-              ],
-            ),
-            Expanded(child: OverLayScreen()),
-          ],
-        ),
+        color: Colors.green,
+        child: OverlayLayout(),
       ),
     ),
   );
 }
 
+// Future<List<Map<String, dynamic>>> _fetchRoutes() async {
+//   User? user = FirebaseAuth.instance.currentUser;
+//   if (user != null) {
+//     DocumentSnapshot<Map<String, dynamic>> userDoc = await FirebaseFirestore
+//         .instance
+//         .collection('users')
+//         .doc(user.uid)
+//         .get();
+//     List<Map<String, dynamic>> routes = List<Map<String, dynamic>>.from(
+//         userDoc.get('routes') ?? [] as List<Map<String, dynamic>>);
+//     return routes;
+//   }
+//   return [];
+// }
+
 Future<List<Map<String, dynamic>>> _fetchRoutes() async {
   User? user = FirebaseAuth.instance.currentUser;
+
   if (user != null) {
+    // Step 1: Fetch the user's document
     DocumentSnapshot<Map<String, dynamic>> userDoc = await FirebaseFirestore
         .instance
         .collection('users')
         .doc(user.uid)
         .get();
-    List<Map<String, dynamic>> routes = List<Map<String, dynamic>>.from(
-        userDoc.get('routes') ?? [] as List<Map<String, dynamic>>);
+
+    // Step 2: Get the list of route IDs
+    List<dynamic> routeIds = userDoc.get('routeIds') ?? [];
+
+    // Step 3: Initialize an empty list to hold the routes
+    List<Map<String, dynamic>> routes = [];
+
+    // Step 4: Fetch each route from the 'routes' collection using the route IDs
+    for (var routeId in routeIds) {
+      DocumentSnapshot<Map<String, dynamic>> routeDoc = await FirebaseFirestore
+          .instance
+          .collection('routes')
+          .doc(routeId)
+          .get();
+
+      if (routeDoc.exists) {
+        routes.add(routeDoc.data()!); // Add the route data to the list
+      }
+    }
+
+    // Step 5: Return the list of routes
     return routes;
   }
+
   return [];
 }
 
@@ -156,7 +169,7 @@ class MyApp extends StatefulWidget {
   final bool isSignedInWithin5Days;
   final List<Map<String, dynamic>>? routes;
 
-  const MyApp(this.isSignedInWithin5Days, this.routes, {Key? key});
+  const MyApp(this.isSignedInWithin5Days, this.routes, {super.key});
 
   @override
   State<MyApp> createState() => _MyAppState();
@@ -165,7 +178,7 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   //listen to notifications
   listenToNotifications() {
-    print("Listening to notification");
+    debugPrint("Listening to notification");
     LocalNotifications.onClickNotification.stream.listen((event) {
       Map<String, dynamic> payloadData = jsonDecode(event);
       Navigator.push(
@@ -206,10 +219,10 @@ class _MyAppState extends State<MyApp> {
         ),
       ],
       child: MaterialApp(
-        title: 'Driver App',
+        title: 'Trip Planner',
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(
-            seedColor: Colors.deepPurple,
+            seedColor: Colors.green,
           ),
           useMaterial3: true,
         ),

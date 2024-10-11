@@ -31,7 +31,6 @@ class _RouteAddStopScreenState extends State<RouteAddStopScreen> {
 
   @override
   void initState() {
-    // TODO: implement initState
     super.initState();
     findPlace = FindPlace();
     filteredList = widget.displayedUserAddedStops;
@@ -43,9 +42,8 @@ class _RouteAddStopScreenState extends State<RouteAddStopScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       resizeToAvoidBottomInset: true,
-      appBar: AppBar(
+      appBar: AppBar( foregroundColor:Colors.white, backgroundColor:Colors.green,
         title: const Text('Choose Destination'),
-        backgroundColor: Colors.amberAccent,
       ),
       body: Container(
         margin: const EdgeInsets.only(left: 20, right: 20, top: 15),
@@ -136,7 +134,7 @@ class _RouteAddStopScreenState extends State<RouteAddStopScreen> {
                       onChanged: (place) {
                         setState(() {
                           suggestions = FindPlace().placeNameAutocompletion(
-                              place ?? '', widget.currentLocationData);
+                              place, widget.currentLocationData);
                         });
                       },
                       decoration: const InputDecoration(

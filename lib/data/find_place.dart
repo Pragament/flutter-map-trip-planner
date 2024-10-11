@@ -1,10 +1,11 @@
 import 'dart:convert';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_map_trip_planner/models/place_suggestion.dart';
 import 'package:flutter_map_trip_planner/utilities/env.dart';
 
 import 'package:http/http.dart' as http;
-import 'package:latlong2/latlong.dart';
+// import 'package:latlong2/latlong.dart';
 import 'package:location/location.dart';
 import '../models/place_geo_points.dart';
 
@@ -45,7 +46,7 @@ class FindPlace {
     final response = await http.get(url);
     if (response.statusCode == 200) {
       final body = json.decode(response.body);
-      print(body);
+      debugPrint("body is: $body");
       PlaceGeoPoints placeGeoPoints = PlaceGeoPoints.fromJson(body);
       return placeGeoPoints;
     } else {
