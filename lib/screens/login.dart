@@ -41,8 +41,6 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
               TextButton(
                 onPressed: () {
                   Navigator.of(context).pop();
-                  // Navigator.of(context)
-                  //     .pushNamedAndRemoveUntil('/allroutes', (route) => false);
                 },
                 child: const Text('Ok'),
               ),
@@ -83,16 +81,12 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
     await _auth.signInWithCredential(credential);
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setString('login_timestamp', DateTime.now().toString());
-    // Create a reference to the "users" collection
     CollectionReference users = FirebaseFirestore.instance.collection('users');
-    // Check if a profile already exists for the logged-in phone number
     QuerySnapshot<Object?> snapshot =
-        await users.where('phoneNumber', isEqualTo: number.phoneNumber).get();
+    await users.where('phoneNumber', isEqualTo: number.phoneNumber).get();
     if (snapshot.docs.isNotEmpty) {
-      // Profile already exists, navigate to the routetable
       Navigator.pushReplacementNamed(context, '/allroutes');
     } else {
-      // Profile doesn't exist, navigate to the profile creation page
       debugPrint("NEW USER");
       Navigator.pushReplacement(
         context,
@@ -135,25 +129,23 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
                   });
                 },
                 initialValue: number,
-                // maxLength: 11,
                 inputDecoration: InputDecoration(
-                    border: InputBorder.none,
-                    enabled: isPhoneNumberVerified ? false : true,
-                    labelText: "Enter mobile number here",
-                    suffixIcon: isPhoneNumberVerified
-                        ? const Icon(
-                            Icons.check_circle,
-                            color: Colors.green,
-                          )
-                        : const Icon(
-                            Icons.running_with_errors_outlined,
-                            color: Colors.red,
-                          )),
+                  border: InputBorder.none,
+                  enabled: isPhoneNumberVerified ? false : true,
+                  labelText: "Enter mobile number here",
+                  suffixIcon: isPhoneNumberVerified
+                      ? const Icon(
+                    Icons.check_circle,
+                    color: Colors.green,
+                  )
+                      : const Icon(
+                    Icons.running_with_errors_outlined,
+                    color: Colors.red,
+                  ),
+                ),
               ),
             ),
-            const SizedBox(
-              height: 30,
-            ),
+            const SizedBox(height: 30),
             ElevatedButton(
               onPressed: isPhoneNumberVerified ? null : _verifyPhoneNumber,
               child: const Text('Send Otp'),
@@ -161,19 +153,19 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
             const SizedBox(height: 16),
             isPhoneNumberVerified
                 ? Text(
-                    "Otp sent to ${number.phoneNumber}",
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  )
+              "Otp sent to ${number.phoneNumber}",
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+              ),
+            )
                 : const Text(
-                    'click the above button to verify phonenumber and'
-                    ' request an otp!',
-                    style: TextStyle(
-                      color: Colors.red,
-                      fontSize: 12,
-                    ),
-                  ),
+              'Click the above button to verify phone number and'
+                  ' request an OTP!',
+              style: TextStyle(
+                color: Colors.red,
+                fontSize: 12,
+              ),
+            ),
             const SizedBox(height: 16),
             TextField(
               controller: _otpController,
@@ -188,6 +180,27 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
             ElevatedButton(
               onPressed: _signInWithPhoneNumber,
               child: const Text('Sign In with OTP'),
+            ),
+            const Spacer(), // Pushes the next button to the bottom
+            SizedBox(
+              width: double.infinity, // Set the button width to take up the full screen width
+              child: ElevatedButton(
+                onPressed: () async {
+                  SharedPreferences prefs = await SharedPreferences.getInstance();
+                  await prefs.setBool('skip_login', true); // Save the skip login state
+                  Navigator.pushReplacementNamed(context, '/allroutes');
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green, // Same as "Send Otp" button
+                  foregroundColor: Colors.white, // Text color (same as "Send Otp" button)
+                ),
+                child: const Text(
+                  'Skip Login',
+                  style: TextStyle(
+                    fontSize: 16,
+                  ),
+                ),
+              ),
             ),
           ],
         ),

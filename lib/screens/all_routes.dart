@@ -56,6 +56,9 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen>
   String? selectedRouteId;
   String? centeredRouteId;
 
+  bool hasSkippedLogin = false;
+
+
   // List<Map<String, dynamic>> filteredUserStops = [];
   List<dynamic> filteredUserRoutes = [];
   Map<String, List<LatLng>> filteredRouteStopsMap = {};
@@ -98,6 +101,15 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen>
       // location.enableBackgroundMode();
       askForContinousLocation();
       askForDisplayOverApps();
+    });
+    _checkSkipLoginState();
+
+  }
+
+  Future<void> _checkSkipLoginState() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      hasSkippedLogin = prefs.getBool('skip_login') ?? false; // Default to false if not set
     });
   }
 
@@ -1394,7 +1406,9 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen>
                 }
               },
             ),
-            floatingActionButton: FloatingActionButtonCustom(
+            floatingActionButton: hasSkippedLogin
+                ? null // Hide the button if user has skipped login
+                : FloatingActionButtonCustom(
               selectedTags: selectedTags,
               locationName: locationName,
               allTagsList: allTagsList,
