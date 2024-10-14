@@ -25,7 +25,12 @@ To contribute to this project, please follow these steps:
 2. Develop your changes in your forked project.
 3. Once development is complete, submit a pull request (PR) to this repository.
 4. After review, your changes will be merged into the default branch.
+---
 
+## Code build instructions
+1. Copy .env.example file as .env
+2. If you need GOOGLE_PLACES_API_KEY or GRAPHHOPPER_API_KEY message author in whatsapp
+3. ```dart run build_runner build```
 
 ---
 
