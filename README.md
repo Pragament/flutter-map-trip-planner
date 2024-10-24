@@ -32,6 +32,10 @@ To contribute to this project, please follow these steps:
 2. If you need GOOGLE_PLACES_API_KEY or GRAPHHOPPER_API_KEY message author in whatsapp
 3. ```dart run build_runner build```
 
+## For firebase login related Code build instructions
+1. https://developers.google.com/android/guides/client-auth ```keytool -list -v -alias androiddebugkey -keystore ~/.android/debug.keystore```![image](https://github.com/user-attachments/assets/aac7528a-fb52-4131-8d0f-64782b5d6af9)
+2. send your SHA1 key in whatsapp to repo author to add your device to company firebase account for debugging.
+
 ---
 
 ## Current App Screenshots
