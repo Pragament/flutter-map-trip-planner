@@ -1,6 +1,7 @@
 // ignore_for_file: use_build_context_synchronously
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_map_trip_planner/providers/loading_provider.dart';
 import 'package:flutter_map_trip_planner/providers/route_provider.dart';
 import 'package:flutter_map_trip_planner/widgets/tags_auto_completion.dart';
@@ -15,6 +16,7 @@ import 'package:provider/provider.dart';
 import 'package:textfield_tags/textfield_tags.dart';
 
 import '../utilities/location_functions.dart';
+import '../widgets/tags_selection_dialog.dart';
 
 class AddStopScreen extends StatefulWidget {
   AddStopScreen({
@@ -294,10 +296,55 @@ class _AddStopScreenState extends State<AddStopScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            TagsAutoCompletion(
-              textfieldTagsController: _textfieldTagsController,
-              allTags: widget.allTags,
-              displayTags: displayTags,
+            // TagsAutoCompletion(
+            //   textfieldTagsController: _textfieldTagsController,
+            //   allTags: widget.allTags,
+            //   displayTags: displayTags,
+            // ),
+            InkWell(
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 5),
+                decoration: BoxDecoration(
+                    border: Border.all(
+                      color: Colors.black,
+                    ),
+                    borderRadius: BorderRadius.circular(5)
+                ),
+                child: Center(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Text(
+                      (_textfieldTagsController.getTags ?? []).isEmpty
+                          ? "Please select tags.."
+                          : "Tags: ${(_textfieldTagsController.getTags ?? []).join(', ')}",
+                      style: TextStyle(fontSize: 16),
+                    ),
+                  ),
+                ),
+              ),
+              onTap: () async {
+                if((_textfieldTagsController.getTags ?? []).isNotEmpty) {
+                  // If the tags were selected first then teh controller must be disposed before use.
+                  _textfieldTagsController.dispose();
+                  _textfieldTagsController = TextfieldTagsController();
+                }
+                final updatedController = await showDialog<TextfieldTagsController>(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (context) {
+                    return TagsSelectionDialog(
+                      textfieldTagsController: _textfieldTagsController, // Reuse the controller
+                      allTags: widget.allTags!,
+                      displayTags: displayTags,
+                    );
+                  },
+                );
+                if (updatedController != null) {
+                  setState(() {
+                    displayTags = [...updatedController.getTags!]; // Update display tags
+                  });
+                }
+              },
             ),
             const SizedBox(height: 20),
             TextField(
