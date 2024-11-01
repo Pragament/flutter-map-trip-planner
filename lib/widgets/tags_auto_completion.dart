@@ -63,6 +63,7 @@ class TagsAutoCompletion extends StatelessWidget {
       },
       onSelected: (String selectedTag) {
         textfieldTagsController.addTag(selectedTag);
+        print("TextFTC value: ${textfieldTagsController.getTags!.contains(selectedTag)}");
       },
       fieldViewBuilder: (context, ttec, tfn, onFieldSubmitted) {
         return TextFieldTags(

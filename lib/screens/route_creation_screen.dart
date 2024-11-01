@@ -7,6 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_map/flutter_map.dart' as flutterMap;
+import 'package:flutter_map_trip_planner/widgets/tags_selection_dialog.dart';
 import 'package:flutter_osm_plugin/flutter_osm_plugin.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:location/location.dart';
@@ -78,6 +79,7 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
 
   @override
   void dispose() {
+    _textfieldTagsController.dispose();
     for (var node in _stopFocusNodes) {
       node.dispose();
     }
@@ -172,7 +174,7 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
     print('STOPS -$stops');
     String? generatedRRule = generatedRRuleNotifier.value;
     String tag = '';
-    List<String> tagsList = _textfieldTagsController.getTags! as List<String>;
+    List<dynamic> tagsList = _textfieldTagsController.getTags! as List<dynamic>;
     if (tagsList.isNotEmpty) {
       for (int i = 0; i < tagsList.length; i++) {
         if (i == tagsList.length - 1) {
@@ -384,11 +386,58 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
                   SizedBox(
                     height: 60,
                     width: MediaQuery.of(context).size.width * 0.55,
-                    child: TagsAutoCompletion(
-                      textfieldTagsController: _textfieldTagsController,
-                      allTags: widget.allTags,
-                      displayTags: displayTags,
+                    // child: TagsAutoCompletion(
+                    //   textfieldTagsController: _textfieldTagsController,
+                    //   allTags: widget.allTags!,
+                    //   displayTags: displayTags,
+                    // ),
+                    child: InkWell(
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 5),
+                        padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 5),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: Colors.black,
+                          ),
+                          borderRadius: BorderRadius.circular(5)
+                        ),
+                        child: Center(
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Text(
+                              (_textfieldTagsController.getTags ?? []).isEmpty
+                                  ? "Please select tags.."
+                                  : "Tags: ${(_textfieldTagsController.getTags ?? []).join(', ')}",
+                              style: TextStyle(fontSize: 15),
+                            ),
+                          ),
+                        ),
+                      ),
+                      onTap: () async {
+                        if((_textfieldTagsController.getTags ?? []).isNotEmpty) {
+                          // If the tags were selected first then teh controller must be disposed before use.
+                          _textfieldTagsController.dispose();
+                          _textfieldTagsController = TextfieldTagsController();
+                        }
+                        final updatedController = await showDialog<TextfieldTagsController>(
+                          context: context,
+                          barrierDismissible: false,
+                          builder: (context) {
+                            return TagsSelectionDialog(
+                              textfieldTagsController: _textfieldTagsController, // Reuse the controller
+                              allTags: widget.allTags!,
+                              displayTags: displayTags,
+                            );
+                          },
+                        );
+                        if (updatedController != null) {
+                          setState(() {
+                            displayTags = [...updatedController.getTags!]; // Update display tags
+                          });
+                        }
+                      },
                     ),
+
                   ),
                   SizedBox(
                     width: MediaQuery.of(context).size.width * 0.33,
