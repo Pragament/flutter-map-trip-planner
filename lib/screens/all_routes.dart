@@ -1617,6 +1617,7 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen>
           return Row(
             mainAxisAlignment: MainAxisAlignment.start,
             children: [
+              index < isSelected.length?
               Checkbox(
                 value: isSelected[index],
                 onChanged: (isChecked) {
@@ -1680,7 +1681,7 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen>
                     }
                   }
                 },
-              ),
+              ): SizedBox(),
               Text(allTagsList[index]),
             ],
           );
