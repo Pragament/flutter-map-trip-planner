@@ -40,9 +40,9 @@ import '../utilities/location_functions.dart';
 import '../utilities/rrule_parser.dart';
 
 class AllRoutesMapScreen extends StatefulWidget {
-  AllRoutesMapScreen({required this.userRoutes, super.key});
+   AllRoutesMapScreen({required this.userRoutes, super.key});
 
-  List<dynamic>? userRoutes;
+ List<dynamic>? userRoutes;
 
   @override
   State<AllRoutesMapScreen> createState() => _AllRoutesMapScreenState();
@@ -1414,6 +1414,8 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen>
               allTagsList: allTagsList,
               cl: currentLocation,
             ),
+
+            
           );
         });
   }
