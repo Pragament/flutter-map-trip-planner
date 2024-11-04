@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter_map_trip_planner/miscellaenous/add_route_to_firebase.dart';
 import 'package:flutter_map_trip_planner/miscellaenous/save_user_location.dart';
 import 'package:flutter_map_trip_planner/providers/location_provider.dart';
+import 'package:flutter_map_trip_planner/screens/event_creation_form.dart';
 import 'package:flutter_map_trip_planner/screens/route_add_stop.dart';
 import 'package:flutter_map_trip_planner/widgets/filter_item.dart';
 import 'package:flutter/material.dart';
@@ -40,9 +41,9 @@ import '../utilities/location_functions.dart';
 import '../utilities/rrule_parser.dart';
 
 class AllRoutesMapScreen extends StatefulWidget {
-   AllRoutesMapScreen({required this.userRoutes, super.key});
+  AllRoutesMapScreen({required this.userRoutes, super.key});
 
- List<dynamic>? userRoutes;
+  List<dynamic>? userRoutes;
 
   @override
   State<AllRoutesMapScreen> createState() => _AllRoutesMapScreenState();
@@ -57,7 +58,6 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen>
   String? centeredRouteId;
 
   bool hasSkippedLogin = false;
-
 
   // List<Map<String, dynamic>> filteredUserStops = [];
   List<dynamic> filteredUserRoutes = [];
@@ -103,13 +103,13 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen>
       askForDisplayOverApps();
     });
     _checkSkipLoginState();
-
   }
 
   Future<void> _checkSkipLoginState() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     setState(() {
-      hasSkippedLogin = prefs.getBool('skip_login') ?? false; // Default to false if not set
+      hasSkippedLogin =
+          prefs.getBool('skip_login') ?? false; // Default to false if not set
     });
   }
 
@@ -1409,13 +1409,11 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen>
             floatingActionButton: hasSkippedLogin
                 ? null // Hide the button if user has skipped login
                 : FloatingActionButtonCustom(
-              selectedTags: selectedTags,
-              locationName: locationName,
-              allTagsList: allTagsList,
-              cl: currentLocation,
-            ),
-
-            
+                    selectedTags: selectedTags,
+                    locationName: locationName,
+                    allTagsList: allTagsList,
+                    cl: currentLocation,
+                  ),
           );
         });
   }
@@ -1617,71 +1615,75 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen>
           return Row(
             mainAxisAlignment: MainAxisAlignment.start,
             children: [
-              index < isSelected.length?
-              Checkbox(
-                value: isSelected[index],
-                onChanged: (isChecked) {
-                  if (isChecked!) {
-                    if (allTagsList[index] == 'All') {
-                      setState(() {
-                        selectedTags = ['All'];
-                      });
-                    } else {
-                      selectedTags.add(allTagsList[index]);
-                    }
-                    setState(() {
-                      isSelected[index] = isChecked;
-                    });
-                  } else {
-                    setState(() {
-                      isSelected[index] = isChecked;
-                      selectedTags.remove(allTagsList[index]);
-                    });
-                  }
-                  int count = 0;
-                  List<LatLng?> initialCenterList =
-                      filteredRouteStopsMap.isEmpty
-                          ? []
-                          : selectedTags.isEmpty
-                              ? [
-                                  LatLng(currentLocation.data!.latitude!,
-                                      currentLocation.data!.longitude!)
-                                ]
-                              : filteredRouteStopsMap.entries.map((e) {
-                                  if (e.key.trim() == selectedTags[0].trim()) {
-                                    if (count == 0) {
-                                      return filteredRouteStopsMap[e.key]?[0];
+              index < isSelected.length
+                  ? Checkbox(
+                      value: isSelected[index],
+                      onChanged: (isChecked) {
+                        if (isChecked!) {
+                          if (allTagsList[index] == 'All') {
+                            setState(() {
+                              selectedTags = ['All'];
+                            });
+                          } else {
+                            selectedTags.add(allTagsList[index]);
+                          }
+                          setState(() {
+                            isSelected[index] = isChecked;
+                          });
+                        } else {
+                          setState(() {
+                            isSelected[index] = isChecked;
+                            selectedTags.remove(allTagsList[index]);
+                          });
+                        }
+                        int count = 0;
+                        List<LatLng?> initialCenterList = filteredRouteStopsMap
+                                .isEmpty
+                            ? []
+                            : selectedTags.isEmpty
+                                ? [
+                                    LatLng(currentLocation.data!.latitude!,
+                                        currentLocation.data!.longitude!)
+                                  ]
+                                : filteredRouteStopsMap.entries.map((e) {
+                                    if (e.key.trim() ==
+                                        selectedTags[0].trim()) {
+                                      if (count == 0) {
+                                        return filteredRouteStopsMap[e.key]?[0];
+                                      }
+                                      count++;
                                     }
-                                    count++;
-                                  }
-                                }).toList();
-                  count = 0;
-                  if (initialCenterList[0] != null) {
-                    initialCenter = initialCenterList[0];
-                    setState(() {
-                      flutterMapController.move(initialCenterList[0]!, 14);
-                    });
-                  } else {
-                    if (routeProvider.userStops.isNotEmpty) {
-                      routeProvider.userStops.map((value) {
-                        if (value['tags'].toString().trim() ==
-                            selectedTags[0].trim()) {
-                          if (count == 0) {
-                            value.entries.map((e) async {
-                              initialCenter = value['point'];
-                              setState(() {
-                                flutterMapController.move(initialCenter!, 14);
-                              });
+                                  }).toList();
+                        count = 0;
+                        if (initialCenterList[0] != null) {
+                          initialCenter = initialCenterList[0];
+                          setState(() {
+                            flutterMapController.move(
+                                initialCenterList[0]!, 14);
+                          });
+                        } else {
+                          if (routeProvider.userStops.isNotEmpty) {
+                            routeProvider.userStops.map((value) {
+                              if (value['tags'].toString().trim() ==
+                                  selectedTags[0].trim()) {
+                                if (count == 0) {
+                                  value.entries.map((e) async {
+                                    initialCenter = value['point'];
+                                    setState(() {
+                                      flutterMapController.move(
+                                          initialCenter!, 14);
+                                    });
+                                  }).toList();
+                                }
+                                count++;
+                              }
+                              count = 0;
                             }).toList();
                           }
-                          count++;
                         }
-                        count = 0;
-                      }).toList();
-                    }
-                  }
-                },
-              ): SizedBox(),
+                      },
+                    )
+                  : const SizedBox(),
               Text(allTagsList[index]),
             ],
           );
@@ -1942,7 +1944,58 @@ class FloatingActionButtonCustom extends StatelessWidget {
                     ),
             );
           },
-        )
+        ),
+        const SizedBox(
+          width: 16,
+        ),
+        Consumer<LoadingProvider>(
+          builder:
+              (BuildContext context, LoadingProvider value, Widget? child) {
+            return FloatingActionButton(
+              heroTag: null,
+              mini: true,
+              onPressed: value.locationLoading
+                  ? () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Text("Loading... Please wait"),
+                          action: SnackBarAction(
+                            label: 'Ok',
+                            onPressed:
+                                ScaffoldMessenger.of(context).clearSnackBars,
+                          ),
+                        ),
+                      );
+                    }
+                  : () async {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => EventForm(
+                            isAdmin: true,
+                          ),
+                        ),
+                      );
+                    },
+              backgroundColor: Colors.green,
+              child: value.locationLoading
+                  ? const Center(
+                      child: SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2.0,
+                        ),
+                      ),
+                    )
+                  : const Icon(
+                      Icons.add,
+                      color: Colors.white,
+                    ),
+            );
+          },
+        ),
       ],
     );
   }
