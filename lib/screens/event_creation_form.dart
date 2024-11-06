@@ -1,12 +1,33 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_map_trip_planner/providers/loading_provider.dart';
+import 'package:flutter_map_trip_planner/providers/route_provider.dart';
 import 'package:flutter_map_trip_planner/screens/route_add_stop.dart';
-import 'package:flutter_map_trip_planner/screens/route_creation_screen.dart';
+
+import 'package:flutter_map_trip_planner/utilities/location_functions.dart';
+import 'package:flutter_map_trip_planner/widgets/tags_selection_dialog.dart';
+import 'package:flutter_osm_plugin/flutter_osm_plugin.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:location/location.dart';
+import 'package:flutter_map/flutter_map.dart' as flutterMap;
+import 'package:flutter_osm_interface/flutter_osm_interface.dart' as osm;
+import 'package:provider/provider.dart';
+import 'package:rrule/rrule.dart' as rrule;
+import 'package:textfield_tags/textfield_tags.dart';
+
+enum Frequency {
+  daily,
+  weekly,
+  monthly,
+  yearly,
+}
 
 class EventForm extends StatefulWidget {
   final bool isAdmin;
 
-  EventForm({required this.isAdmin});
+  EventForm(
+      {required this.currentLocationData, required this.isAdmin, super.key});
+  late LocationData? currentLocationData;
 
   @override
   _EventFormState createState() => _EventFormState();
@@ -28,11 +49,31 @@ class _EventFormState extends State<EventForm> {
   late TextEditingController _startTimeController;
   late TextEditingController _endTimeController;
   late TextEditingController _tagsController;
+  final List<TextEditingController> _stopControllers = [];
+  final List<TextEditingController> _stopNameControllers = [];
+  List<Map<String, dynamic>> displayedUserAddedStops = [];
+  List<Map<String, dynamic>> copy = [];
+
+  List<LatLng> stops = [];
+  List<String> displayTags = [];
+  late TextfieldTagsController _textfieldTagsController;
+  late flutterMap.MapController flutterMapController;
+  TimeOfDay? _startTime;
+  TimeOfDay? _endTime;
+
+  String _frequency = 'daily'; // Example frequency value
+  int _interval = 1;
+  int _dayOfMonth = 1;
+  DateTime _untilDate = DateTime.now().add(Duration(days: 365));
+  DateTime _startDate = DateTime.now();
+  String _rrule = '';
 
   bool _isOnlineEvent = false;
   bool _isApprovedEvent = false;
   List<String> _stops = [];
   late LocationData _sampleLocationData;
+  final List<FocusNode> _stopFocusNodes = [FocusNode()];
+  late flutterMap.Marker marker;
 
   @override
   void initState() {
@@ -53,26 +94,126 @@ class _EventFormState extends State<EventForm> {
 
     _rruleController.text =
         'RRULE:FREQ=MONTHLY;BYMONTHDAY=22;INTERVAL=1;UNTIL=20240823';
+    _textfieldTagsController = TextfieldTagsController();
+    marker = flutterMap.Marker(
+      width: 80.0,
+      height: 80.0,
+      point: LatLng(widget.currentLocationData!.latitude!,
+          widget.currentLocationData!.longitude!),
+      child: const Icon(
+        Icons.circle_sharp,
+        color: Colors.blue,
+        size: 16,
+      ),
+    );
 
-    Map<String, dynamic> sampleLocationMap = {
-      'latitude': 37.7749,
-      'longitude': -122.4194,
-      'accuracy': 5.0,
-      'altitude': 10.0,
-      'speed': 0.0,
-      'speed_accuracy': 0.0,
-      'heading': 0.0,
-      'time': DateTime.now().millisecondsSinceEpoch.toDouble(),
-      'isMock': false,
-      'verticalAccuracy': 5.0,
-      'headingAccuracy': 1.0,
-      'elapsedRealtimeNanos': 0.0,
-      'elapsedRealtimeUncertaintyNanos': 0.0,
-      'satelliteNumber': 0,
-      'provider': 'gps',
-    };
+    osm.GeoPoint geoPoint = osm.GeoPoint(
+        latitude: widget.currentLocationData!.latitude!,
+        longitude: widget.currentLocationData!.longitude!);
+    //  _stopNameControllers.add(TextEditingController(text: widget.locationName));
+    _stopControllers.add(TextEditingController(text: geoPoint.toString()));
+    flutterMapController = flutterMap.MapController();
+    stops.add(LatLng(widget.currentLocationData!.latitude!,
+        widget.currentLocationData!.longitude!));
+  }
 
-    _sampleLocationData = LocationData.fromMap(sampleLocationMap);
+  void _removeStop(int index) {
+    setState(() {
+      if (index >= 0 && index < _stopControllers.length) {
+        _stopNameControllers.removeAt(index);
+        _stopControllers.removeAt(index);
+        stops.removeAt(index);
+        _stopFocusNodes.removeAt(index);
+      }
+    });
+  }
+
+  Future<void> _fetchUserAddedStops() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      List<dynamic> userAddedStopsData =
+          Provider.of<RouteProvider>(context, listen: false).userStops;
+      print('USER ADDED STOPS : $userAddedStopsData');
+      displayedUserAddedStops = userAddedStopsData.map((stopData) {
+        return {
+          'stop': stopData['stop'],
+          'selectedPoint': stopData['selectedPoint'],
+        };
+      }).toList();
+      copy = userAddedStopsData.map((stopData) {
+        return {
+          'stop': stopData['stop'],
+          'selectedPoint': stopData['selectedPoint']
+        };
+      }).toList();
+    }
+    setState(() {
+      displayedUserAddedStops.removeWhere((element) =>
+          (element['selectedPoint'].toString().isEmpty ||
+              element['selectedPoint'] == null));
+      displayedUserAddedStops = displayedUserAddedStops;
+    });
+  }
+
+  //funtion to pick time from timepicker
+  Future<void> _selectTime(BuildContext context, bool isStartTime) async {
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+    );
+    if (picked != null) {
+      setState(() {
+        if (isStartTime) {
+          _startTime = picked;
+          _startTimeController.text = picked.format(context);
+        } else {
+          _endTime = picked;
+          _endTimeController.text = picked.format(context);
+        }
+      });
+    }
+  }
+
+  // Generate RRULE based on user input
+  void _generateRRule() {
+    // final rule = rrule.RecurrenceRule(
+    //   frequency: rrule.Frequency.values.firstWhere((f) => f.name == _frequency),
+    //   interval: _interval,
+    //   byMonthDays: [_dayOfMonth],
+    //   until: _untilDate,
+    //   weekStart: _startDate.weekday, // Use weekday instead of day for weekStart
+    // );
+    // setState(() {
+    //   _rrule = rule.toString();
+    // });
+  }
+
+  // Select start date
+  Future<void> _selectStartDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _startDate,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null && picked != _startDate)
+      setState(() {
+        _startDate = picked;
+      });
+  }
+
+  // Select until date
+  Future<void> _selectUntilDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _untilDate ?? _startDate,
+      firstDate: _startDate,
+      lastDate: DateTime(2100),
+    );
+    if (picked != null && picked != _untilDate)
+      setState(() {
+        _untilDate = picked;
+      });
   }
 
   @override
@@ -120,30 +261,293 @@ class _EventFormState extends State<EventForm> {
                   },
                 ),
                 if (!_isOnlineEvent)
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 16.0),
-                      TextFormField(
-                        controller: _pincodeController,
-                        decoration: const InputDecoration(
-                          labelText: 'Pincode',
-                          border: OutlineInputBorder(),
+                  SizedBox(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 16.0),
+                        TextFormField(
+                          controller: _pincodeController,
+                          decoration: const InputDecoration(
+                            labelText: 'Pincode',
+                            border: OutlineInputBorder(),
+                          ),
+                          keyboardType: TextInputType.number,
                         ),
-                        keyboardType: TextInputType.number,
-                      ),
-                      const SizedBox(height: 16.0),
-                      const Text('Stops'),
-                      // ConstrainedBox(
-                      //   constraints: BoxConstraints(maxHeight: 500.0),
-                      //   child: RouteCreationScreen(
-                      //     currentLocationData: _sampleLocationData,
-                      //     locationName: "sample location data",
-                      //     selectedTags: ['tag1', 'tag2'],
-                      //     allTags: ['tag1', 'tag2', 'tag3'],
-                      //   ),
-                      // ),
-                    ],
+                        const SizedBox(height: 16.0),
+                        const Center(
+                          child: Text(
+                            'STOPS',
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 20),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          height: 150,
+                          child: ReorderableListView.builder(
+                            shrinkWrap: true,
+                            itemCount: _stopNameControllers.length,
+                            itemBuilder: (context, index) {
+                              return Padding(
+                                key: ValueKey(index),
+                                padding: const EdgeInsets.fromLTRB(0, 0, 0, 10),
+                                child: Row(
+                                  children: <Widget>[
+                                    const Icon(Icons.reorder),
+                                    SizedBox(
+                                      height: 60,
+                                      width: MediaQuery.of(context).size.width *
+                                          0.70,
+                                      child: TextField(
+                                        readOnly: true,
+                                        // enabled: false,
+                                        controller: _stopNameControllers[index],
+                                        decoration: InputDecoration(
+                                            labelText: 'Stop ${index + 1}',
+                                            border: const OutlineInputBorder(),
+                                            suffixIcon: IconButton(
+                                              onPressed: () async {
+                                                final selectedPoint =
+                                                    await showSimplePickerLocation(
+                                                  context: context,
+                                                  isDismissible: true,
+                                                  title: "Select Stop",
+                                                  textConfirmPicker: "pick",
+                                                  zoomOption: const ZoomOption(
+                                                    initZoom: 15,
+                                                  ),
+                                                  initPosition: parseGeoPoint(
+                                                      _stopControllers[index]
+                                                          .text),
+                                                  radius: 15.0,
+                                                );
+                                                if (selectedPoint != null) {
+                                                  osm.GeoPoint geoPoint =
+                                                      selectedPoint;
+                                                  double latitude =
+                                                      geoPoint.latitude;
+                                                  double longitude =
+                                                      geoPoint.longitude;
+                                                  setState(() {
+                                                    stops[index] = LatLng(
+                                                        latitude, longitude);
+                                                  });
+                                                  _stopNameControllers[index]
+                                                          .text =
+                                                      (await getPlaceName(
+                                                          latitude,
+                                                          longitude))!;
+                                                  _stopControllers[index].text =
+                                                      geoPoint.toString();
+                                                }
+                                              },
+                                              icon: const Icon(
+                                                  Icons.gps_not_fixed),
+                                            )),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.remove_circle),
+                                      onPressed: () => _removeStop(index),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                            onReorder: (int oldIndex, int newIndex) {
+                              setState(() {
+                                if (oldIndex < newIndex) {
+                                  newIndex--;
+                                }
+                                TextEditingController stopNameController =
+                                    _stopNameControllers.removeAt(oldIndex);
+                                TextEditingController stopController =
+                                    _stopControllers.removeAt(oldIndex);
+                                LatLng stop = stops.removeAt(oldIndex);
+                                _stopNameControllers.insert(
+                                    newIndex, stopNameController);
+                                _stopControllers.insert(
+                                    newIndex, stopController);
+                                stops.insert(newIndex, stop);
+                              });
+                            },
+                          ),
+                        ),
+                        Center(
+                          child: ElevatedButton(
+                            onPressed: () async {
+                              await _fetchUserAddedStops();
+                              osm.GeoPoint selectedPoint = osm.GeoPoint(
+                                latitude: widget.currentLocationData!.latitude!,
+                                longitude:
+                                    widget.currentLocationData!.longitude!,
+                              );
+                              String? updatedStopName;
+                              List<dynamic> data = await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (ctx) => RouteAddStopScreen(
+                                    currentLocationData:
+                                        widget.currentLocationData!,
+                                    displayedUserAddedStops:
+                                        displayedUserAddedStops,
+                                  ),
+                                ),
+                              );
+                              updatedStopName = data[0]?.toString() ?? '';
+                              selectedPoint = data[1] as osm.GeoPoint;
+                              if (updatedStopName.trim().isEmpty) {
+                                updatedStopName = await getPlaceName(
+                                  selectedPoint.latitude,
+                                  selectedPoint.longitude,
+                                );
+                              }
+                              String updatedStop = selectedPoint.toString();
+                              setState(() {
+                                _stopNameControllers.add(TextEditingController(
+                                    text: updatedStopName));
+                                _stopControllers.add(
+                                    TextEditingController(text: updatedStop));
+                                _stopFocusNodes.add(FocusNode());
+                                stops.add(LatLng(selectedPoint.latitude,
+                                    selectedPoint.longitude));
+                              });
+                            }, // _addStop
+                            child: const Text('Add Stop'),
+                          ),
+                        ),
+                        SizedBox(
+                          height: 200,
+                          child: Stack(
+                            children: [
+                              flutterMap.FlutterMap(
+                                mapController: flutterMapController,
+                                options: flutterMap.MapOptions(
+                                  initialCenter: LatLng(
+                                    widget.currentLocationData!.latitude!,
+                                    widget.currentLocationData!.longitude!,
+                                  ),
+                                  initialZoom: 14.0,
+                                ),
+                                children: [
+                                  flutterMap.TileLayer(
+                                    urlTemplate:
+                                        "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                                  ),
+                                  flutterMap.PolylineLayer(
+                                    polylines: [
+                                      flutterMap.Polyline(
+                                        points: stops,
+                                        strokeWidth: 4,
+                                        color: Colors.blue,
+                                      ),
+                                    ],
+                                  ),
+                                  flutterMap.MarkerLayer(
+                                    markers: [
+                                      for (int i = 0; i < stops.length; i++)
+                                        flutterMap.Marker(
+                                          width: 80.0,
+                                          height: 80.0,
+                                          point: stops[i],
+                                          child: Stack(
+                                            children: [
+                                              const Positioned(
+                                                top: 17.4,
+                                                left: 28,
+                                                child: Icon(
+                                                  Icons.location_on,
+                                                  color: Colors.black,
+                                                ),
+                                              ),
+                                              Positioned(
+                                                top: 27.4,
+                                                left: 25,
+                                                child: Text(
+                                                  '${i + 1}',
+                                                  style: const TextStyle(
+                                                    color: Colors.black,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      marker,
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              Positioned(
+                                bottom: 10,
+                                right: 10,
+                                child: Consumer<LoadingProvider>(
+                                  builder: (BuildContext context,
+                                      LoadingProvider loadingProvider,
+                                      Widget? child) {
+                                    return FloatingActionButton(
+                                      onPressed: () async {
+                                        loadingProvider
+                                            .changeRouteCreationUpdateLocationState(
+                                                true);
+                                        widget.currentLocationData =
+                                            await fetchCurrentLocation();
+                                        loadingProvider
+                                            .changeRouteCreationUpdateLocationState(
+                                                false);
+                                        print(
+                                            'Updated Location  ==>  $widget.currentLocationData');
+                                        setState(() {
+                                          marker = flutterMap.Marker(
+                                            width: 80.0,
+                                            height: 80.0,
+                                            point: LatLng(
+                                                widget.currentLocationData!
+                                                    .latitude!,
+                                                widget.currentLocationData!
+                                                    .longitude!),
+                                            child: const Icon(
+                                              Icons.circle_sharp,
+                                              color: Colors.blue,
+                                              size: 16,
+                                            ),
+                                          );
+                                        });
+                                        flutterMapController.move(
+                                            LatLng(
+                                              widget.currentLocationData!
+                                                  .latitude!,
+                                              widget.currentLocationData!
+                                                  .longitude!,
+                                            ),
+                                            14);
+                                      },
+                                      child: loadingProvider
+                                              .routeCreationUpdateLocation
+                                          ? const Center(
+                                              child: SizedBox(
+                                                width: 25,
+                                                height: 25,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                            )
+                                          : const Icon(
+                                              Icons.location_searching,
+                                            ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 const SizedBox(height: 16.0),
                 TextFormField(
@@ -196,37 +600,117 @@ class _EventFormState extends State<EventForm> {
                   keyboardType: TextInputType.number,
                 ),
                 const SizedBox(height: 16.0),
-                TextFormField(
-                  controller: _rruleController,
+                DropdownButtonFormField<Frequency>(
+                  value:
+                      Frequency.values.firstWhere((f) => f.name == _frequency),
+                  onChanged: (Frequency? newValue) {
+                    // _generateRRule();
+                    setState(() {
+                      _frequency = newValue!.name;
+                    });
+                  },
+                  items: Frequency.values.map((Frequency frequency) {
+                    return DropdownMenuItem<Frequency>(
+                      value: frequency,
+                      child: Text(frequency.name),
+                    );
+                  }).toList(),
                   decoration: const InputDecoration(
-                    labelText: 'RRULE',
+                    labelText: 'Frequency',
                     border: OutlineInputBorder(),
                   ),
                 ),
                 const SizedBox(height: 16.0),
-                TextFormField(
-                  controller: _startTimeController,
-                  decoration: const InputDecoration(
-                    labelText: 'Start Time',
-                    border: OutlineInputBorder(),
+                GestureDetector(
+                  onTap: () => _selectTime(context, true),
+                  child: AbsorbPointer(
+                    child: TextFormField(
+                      controller: _startTimeController,
+                      readOnly: true,
+                      decoration: InputDecoration(
+                        labelText: 'Start Time',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16.0),
-                TextFormField(
-                  controller: _endTimeController,
-                  decoration: const InputDecoration(
-                    labelText: 'End Time',
-                    border: OutlineInputBorder(),
+                GestureDetector(
+                  onTap: () => _selectTime(context, false),
+                  child: AbsorbPointer(
+                    child: TextFormField(
+                      controller: _endTimeController,
+                      readOnly: true,
+                      decoration: const InputDecoration(
+                        labelText: 'End Time',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16.0),
-                TextFormField(
-                  controller: _tagsController,
-                  decoration: const InputDecoration(
-                    labelText: 'Tags',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
+                // SizedBox(
+                //   child: Row(
+                //     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                //     children: [
+                //       SizedBox(
+                //         height: 60,
+                //         width: MediaQuery.of(context).size.width * 0.55,
+                //         child: InkWell(
+                //           child: Container(
+                //             margin: const EdgeInsets.symmetric(
+                //                 vertical: 5, horizontal: 5),
+                //             padding: const EdgeInsets.symmetric(
+                //                 vertical: 2, horizontal: 5),
+                //             decoration: BoxDecoration(
+                //                 border: Border.all(
+                //                   color: Colors.black,
+                //                 ),
+                //                 borderRadius: BorderRadius.circular(5)),
+                //             child: Center(
+                //               child: SingleChildScrollView(
+                //                 scrollDirection: Axis.horizontal,
+                //                 child: Text(
+                //                   (_textfieldTagsController.getTags ?? [])
+                //                           .isEmpty
+                //                       ? "Please select tags.."
+                //                       : "Tags: ${(_textfieldTagsController.getTags ?? []).join(', ')}",
+                //                   style: TextStyle(fontSize: 15),
+                //                 ),
+                //               ),
+                //             ),
+                //           ),
+                //           onTap: () async {
+                //             if ((_textfieldTagsController.getTags ?? [])
+                //                 .isNotEmpty) {
+                //               // If the tags were selected first then teh controller must be disposed before use.
+                //               _textfieldTagsController.dispose();
+                //               _textfieldTagsController =
+                //                   TextfieldTagsController();
+                //             }
+                //             final updatedController =
+                //                 await showDialog<TextfieldTagsController>(
+                //               context: context,
+                //               barrierDismissible: false,
+                //               builder: (context) {
+                //                 return TagsSelectionDialog(
+                //                   textfieldTagsController:
+                //                       _textfieldTagsController, // Reuse the controller
+                //                   allTags: displayTags,
+                //                   displayTags: displayTags,
+                //                 );
+                //               },
+                //             );
+                //             if (updatedController != null) {
+                //               setState(() {
+                //                 displayTags = [
+                //                   ...updatedController.getTags!
+                //                 ]; // Update display tags
+                //               });
+                //             }
+                //           },
+                //         ),
+                //       ),
                 const SizedBox(height: 16.0),
                 if (widget.isAdmin)
                   SwitchListTile(

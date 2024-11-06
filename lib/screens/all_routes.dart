@@ -58,6 +58,7 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen>
   String? centeredRouteId;
 
   bool hasSkippedLogin = false;
+  bool isAdmin = true;
 
   // List<Map<String, dynamic>> filteredUserStops = [];
   List<dynamic> filteredUserRoutes = [];
@@ -80,6 +81,7 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen>
   late StreamSubscription<LocationData> locationStreamSubscription;
   late Marker marker;
   List<TextEditingController> filterStopsController = [];
+  //dummy data for current location
 
   @override
   void initState() {
@@ -1413,6 +1415,7 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen>
                     locationName: locationName,
                     allTagsList: allTagsList,
                     cl: currentLocation,
+                    isAdmin: isAdmin,
                   ),
           );
         });
@@ -1830,12 +1833,14 @@ class FloatingActionButtonCustom extends StatelessWidget {
     required this.locationName,
     required this.allTagsList,
     required this.cl,
+    required this.isAdmin,
   });
 
   final List<String> selectedTags;
   final String? locationName;
   final List<String> allTagsList;
   final AsyncSnapshot<LocationData> cl;
+  final bool isAdmin;
 
   @override
   Widget build(BuildContext context) {
@@ -1948,54 +1953,55 @@ class FloatingActionButtonCustom extends StatelessWidget {
         const SizedBox(
           width: 16,
         ),
-        Consumer<LoadingProvider>(
-          builder:
-              (BuildContext context, LoadingProvider value, Widget? child) {
-            return FloatingActionButton(
-              heroTag: null,
-              mini: true,
-              onPressed: value.locationLoading
-                  ? () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: const Text("Loading... Please wait"),
-                          action: SnackBarAction(
-                            label: 'Ok',
-                            onPressed:
-                                ScaffoldMessenger.of(context).clearSnackBars,
+        if (isAdmin)
+          Consumer<LoadingProvider>(
+            builder:
+                (BuildContext context, LoadingProvider value, Widget? child) {
+              return FloatingActionButton(
+                heroTag: null,
+                mini: true,
+                onPressed: value.locationLoading
+                    ? () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text("Loading... Please wait"),
+                            action: SnackBarAction(
+                              label: 'Ok',
+                              onPressed:
+                                  ScaffoldMessenger.of(context).clearSnackBars,
+                            ),
+                          ),
+                        );
+                      }
+                    : () async {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => EventForm(
+                              currentLocationData: cl.data,
+                              isAdmin: true,
+                            ),
+                          ),
+                        );
+                      },
+                backgroundColor: Colors.green,
+                child: value.locationLoading
+                    ? const Center(
+                        child: SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
                           ),
                         ),
-                      );
-                    }
-                  : () async {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => EventForm(
-                            isAdmin: true,
-                          ),
-                        ),
-                      );
-                    },
-              backgroundColor: Colors.green,
-              child: value.locationLoading
-                  ? const Center(
-                      child: SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2.0,
-                        ),
+                      )
+                    : const Icon(
+                        Icons.add,
+                        color: Colors.white,
                       ),
-                    )
-                  : const Icon(
-                      Icons.add,
-                      color: Colors.white,
-                    ),
-            );
-          },
-        ),
+              );
+            },
+          ),
       ],
     );
   }
