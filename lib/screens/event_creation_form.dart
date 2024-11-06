@@ -55,7 +55,7 @@ class _EventFormState extends State<EventForm> {
   List<Map<String, dynamic>> copy = [];
 
   List<LatLng> stops = [];
-  List<String> displayTags = [];
+  List<String> tags = [];
   late TextfieldTagsController _textfieldTagsController;
   late flutterMap.MapController flutterMapController;
   TimeOfDay? _startTime;
@@ -64,14 +64,13 @@ class _EventFormState extends State<EventForm> {
   String _frequency = 'daily'; // Example frequency value
   int _interval = 1;
   int _dayOfMonth = 1;
-  DateTime _untilDate = DateTime.now().add(Duration(days: 365));
+  DateTime _untilDate = DateTime.now().add(const Duration(days: 365));
   DateTime _startDate = DateTime.now();
   String _rrule = '';
 
   bool _isOnlineEvent = false;
   bool _isApprovedEvent = false;
   List<String> _stops = [];
-  late LocationData _sampleLocationData;
   final List<FocusNode> _stopFocusNodes = [FocusNode()];
   late flutterMap.Marker marker;
 
@@ -214,6 +213,24 @@ class _EventFormState extends State<EventForm> {
       setState(() {
         _untilDate = picked;
       });
+  }
+
+//save tags
+  void addTag(String tag) {
+    if (tag.isNotEmpty) {
+      setState(() {
+        tags.add(tag);
+      });
+    }
+  }
+
+  //remove tag
+  void removeTag(String tag) {
+    if (tag.isNotEmpty) {
+      setState(() {
+        tags.remove(tag);
+      });
+    }
   }
 
   @override
@@ -627,7 +644,7 @@ class _EventFormState extends State<EventForm> {
                     child: TextFormField(
                       controller: _startTimeController,
                       readOnly: true,
-                      decoration: InputDecoration(
+                      decoration: const InputDecoration(
                         labelText: 'Start Time',
                         border: OutlineInputBorder(),
                       ),
@@ -649,68 +666,47 @@ class _EventFormState extends State<EventForm> {
                   ),
                 ),
                 const SizedBox(height: 16.0),
-                // SizedBox(
-                //   child: Row(
-                //     mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                //     children: [
-                //       SizedBox(
-                //         height: 60,
-                //         width: MediaQuery.of(context).size.width * 0.55,
-                //         child: InkWell(
-                //           child: Container(
-                //             margin: const EdgeInsets.symmetric(
-                //                 vertical: 5, horizontal: 5),
-                //             padding: const EdgeInsets.symmetric(
-                //                 vertical: 2, horizontal: 5),
-                //             decoration: BoxDecoration(
-                //                 border: Border.all(
-                //                   color: Colors.black,
-                //                 ),
-                //                 borderRadius: BorderRadius.circular(5)),
-                //             child: Center(
-                //               child: SingleChildScrollView(
-                //                 scrollDirection: Axis.horizontal,
-                //                 child: Text(
-                //                   (_textfieldTagsController.getTags ?? [])
-                //                           .isEmpty
-                //                       ? "Please select tags.."
-                //                       : "Tags: ${(_textfieldTagsController.getTags ?? []).join(', ')}",
-                //                   style: TextStyle(fontSize: 15),
-                //                 ),
-                //               ),
-                //             ),
-                //           ),
-                //           onTap: () async {
-                //             if ((_textfieldTagsController.getTags ?? [])
-                //                 .isNotEmpty) {
-                //               // If the tags were selected first then teh controller must be disposed before use.
-                //               _textfieldTagsController.dispose();
-                //               _textfieldTagsController =
-                //                   TextfieldTagsController();
-                //             }
-                //             final updatedController =
-                //                 await showDialog<TextfieldTagsController>(
-                //               context: context,
-                //               barrierDismissible: false,
-                //               builder: (context) {
-                //                 return TagsSelectionDialog(
-                //                   textfieldTagsController:
-                //                       _textfieldTagsController, // Reuse the controller
-                //                   allTags: displayTags,
-                //                   displayTags: displayTags,
-                //                 );
-                //               },
-                //             );
-                //             if (updatedController != null) {
-                //               setState(() {
-                //                 displayTags = [
-                //                   ...updatedController.getTags!
-                //                 ]; // Update display tags
-                //               });
-                //             }
-                //           },
-                //         ),
-                //       ),
+                Column(
+                  children: [
+                    Row(
+                      children: [
+                        TextFormField(
+                          controller: _tagsController,
+                          decoration: const InputDecoration(
+                            labelText: 'Tags',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                        ElevatedButton(
+                            onPressed: () {
+                              addTag(_tagsController.text);
+                              _tagsController.clear();
+                            },
+                            child: const Text("Add Tag"))
+                      ],
+                    ),
+                    Container(
+                      height: 20,
+                      decoration: BoxDecoration(border: Border.all()),
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            ...tags.map((tag) {
+                              return ListTile(
+                                title: Text(tag),
+                                trailing: TextButton(
+                                    onPressed: () => removeTag(tag),
+                                    child:
+                                        const Icon(Icons.dangerous_outlined)),
+                              );
+                            })
+                          ],
+                        ),
+                      ),
+                    )
+                  ],
+                ),
                 const SizedBox(height: 16.0),
                 if (widget.isAdmin)
                   SwitchListTile(
