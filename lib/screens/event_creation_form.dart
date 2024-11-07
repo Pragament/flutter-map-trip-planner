@@ -12,7 +12,9 @@ import 'package:location/location.dart';
 import 'package:flutter_map/flutter_map.dart' as flutterMap;
 import 'package:flutter_osm_interface/flutter_osm_interface.dart' as osm;
 import 'package:provider/provider.dart';
-import 'package:rrule/rrule.dart' as rrule;
+import 'package:rrule/rrule.dart';
+import 'package:rrule_generator/rrule_generator.dart';
+
 import 'package:textfield_tags/textfield_tags.dart';
 
 enum Frequency {
@@ -53,6 +55,7 @@ class _EventFormState extends State<EventForm> {
   final List<TextEditingController> _stopNameControllers = [];
   List<Map<String, dynamic>> displayedUserAddedStops = [];
   List<Map<String, dynamic>> copy = [];
+  ValueNotifier<String?> generatedRRuleNotifier = ValueNotifier(null);
 
   List<LatLng> stops = [];
   List<String> tags = [];
@@ -66,13 +69,15 @@ class _EventFormState extends State<EventForm> {
   int _dayOfMonth = 1;
   DateTime _untilDate = DateTime.now().add(const Duration(days: 365));
   DateTime _startDate = DateTime.now();
-  String _rrule = '';
 
   bool _isOnlineEvent = false;
   bool _isApprovedEvent = false;
-  List<String> _stops = [];
+
   final List<FocusNode> _stopFocusNodes = [FocusNode()];
   late flutterMap.Marker marker;
+
+  String savedRRule =
+      'RRULE:FREQ=MONTHLY;BYMONTHDAY=22;INTERVAL=1;UNTIL=20240823';
 
   @override
   void initState() {
@@ -91,8 +96,6 @@ class _EventFormState extends State<EventForm> {
     _endTimeController = TextEditingController();
     _tagsController = TextEditingController();
 
-    _rruleController.text =
-        'RRULE:FREQ=MONTHLY;BYMONTHDAY=22;INTERVAL=1;UNTIL=20240823';
     _textfieldTagsController = TextfieldTagsController();
     marker = flutterMap.Marker(
       width: 80.0,
@@ -174,45 +177,50 @@ class _EventFormState extends State<EventForm> {
   }
 
   // Generate RRULE based on user input
-  void _generateRRule() {
-    // final rule = rrule.RecurrenceRule(
-    //   frequency: rrule.Frequency.values.firstWhere((f) => f.name == _frequency),
-    //   interval: _interval,
-    //   byMonthDays: [_dayOfMonth],
-    //   until: _untilDate,
-    //   weekStart: _startDate.weekday, // Use weekday instead of day for weekStart
-    // );
-    // setState(() {
-    //   _rrule = rule.toString();
-    // });
-  }
 
-  // Select start date
-  Future<void> _selectStartDate(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
+  void _editRRule() async {
+    final rrule = await showDialog<String>(
       context: context,
-      initialDate: _startDate,
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
+      builder: (BuildContext context) => AlertDialog(
+        content: SingleChildScrollView(
+          child: RRuleGenerator(
+            initialRRule: generatedRRuleNotifier.value ?? '',
+            config: RRuleGeneratorConfig(),
+            textDelegate: const EnglishRRuleTextDelegate(),
+            onChange: (rrule) {
+              generatedRRuleNotifier.value = rrule;
+            },
+          ),
+        ),
+        actions: <Widget>[
+          const Text(
+            'Don\'t skip stop conditions or else you will end up with error!',
+            style: TextStyle(
+              color: Colors.red,
+            ),
+          ),
+          TextButton(
+            child: const Text('Cancel'),
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+          ),
+          TextButton(
+            child: const Text('Save'),
+            onPressed: () {
+              final rrule = generatedRRuleNotifier.value;
+              Navigator.of(context).pop(rrule);
+            },
+          ),
+        ],
+      ),
     );
-    if (picked != null && picked != _startDate)
+    if (rrule != null) {
+      generatedRRuleNotifier.value = rrule;
       setState(() {
-        _startDate = picked;
+        savedRRule = rrule;
       });
-  }
-
-  // Select until date
-  Future<void> _selectUntilDate(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _untilDate ?? _startDate,
-      firstDate: _startDate,
-      lastDate: DateTime(2100),
-    );
-    if (picked != null && picked != _untilDate)
-      setState(() {
-        _untilDate = picked;
-      });
+    }
   }
 
 //save tags
@@ -300,97 +308,103 @@ class _EventFormState extends State<EventForm> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        SizedBox(
-                          height: 150,
-                          child: ReorderableListView.builder(
-                            shrinkWrap: true,
-                            itemCount: _stopNameControllers.length,
-                            itemBuilder: (context, index) {
-                              return Padding(
-                                key: ValueKey(index),
-                                padding: const EdgeInsets.fromLTRB(0, 0, 0, 10),
-                                child: Row(
-                                  children: <Widget>[
-                                    const Icon(Icons.reorder),
-                                    SizedBox(
-                                      height: 60,
-                                      width: MediaQuery.of(context).size.width *
-                                          0.70,
-                                      child: TextField(
-                                        readOnly: true,
-                                        // enabled: false,
-                                        controller: _stopNameControllers[index],
-                                        decoration: InputDecoration(
-                                            labelText: 'Stop ${index + 1}',
-                                            border: const OutlineInputBorder(),
-                                            suffixIcon: IconButton(
-                                              onPressed: () async {
-                                                final selectedPoint =
-                                                    await showSimplePickerLocation(
-                                                  context: context,
-                                                  isDismissible: true,
-                                                  title: "Select Stop",
-                                                  textConfirmPicker: "pick",
-                                                  zoomOption: const ZoomOption(
-                                                    initZoom: 15,
-                                                  ),
-                                                  initPosition: parseGeoPoint(
-                                                      _stopControllers[index]
-                                                          .text),
-                                                  radius: 15.0,
-                                                );
-                                                if (selectedPoint != null) {
-                                                  osm.GeoPoint geoPoint =
-                                                      selectedPoint;
-                                                  double latitude =
-                                                      geoPoint.latitude;
-                                                  double longitude =
-                                                      geoPoint.longitude;
-                                                  setState(() {
-                                                    stops[index] = LatLng(
-                                                        latitude, longitude);
-                                                  });
-                                                  _stopNameControllers[index]
-                                                          .text =
-                                                      (await getPlaceName(
-                                                          latitude,
-                                                          longitude))!;
-                                                  _stopControllers[index].text =
-                                                      geoPoint.toString();
-                                                }
-                                              },
-                                              icon: const Icon(
-                                                  Icons.gps_not_fixed),
-                                            )),
+                        if (_stopNameControllers.isNotEmpty)
+                          SizedBox(
+                            child: ReorderableListView.builder(
+                              shrinkWrap: true,
+                              itemCount: _stopNameControllers.length,
+                              itemBuilder: (context, index) {
+                                return Padding(
+                                  key: ValueKey(index),
+                                  padding:
+                                      const EdgeInsets.fromLTRB(0, 0, 0, 10),
+                                  child: Row(
+                                    children: <Widget>[
+                                      const Icon(Icons.reorder),
+                                      SizedBox(
+                                        height: 60,
+                                        width:
+                                            MediaQuery.of(context).size.width *
+                                                0.70,
+                                        child: TextField(
+                                          readOnly: true,
+                                          // enabled: false,
+                                          controller:
+                                              _stopNameControllers[index],
+                                          decoration: InputDecoration(
+                                              labelText: 'Stop ${index + 1}',
+                                              border:
+                                                  const OutlineInputBorder(),
+                                              suffixIcon: IconButton(
+                                                onPressed: () async {
+                                                  final selectedPoint =
+                                                      await showSimplePickerLocation(
+                                                    context: context,
+                                                    isDismissible: true,
+                                                    title: "Select Stop",
+                                                    textConfirmPicker: "pick",
+                                                    zoomOption:
+                                                        const ZoomOption(
+                                                      initZoom: 15,
+                                                    ),
+                                                    initPosition: parseGeoPoint(
+                                                        _stopControllers[index]
+                                                            .text),
+                                                    radius: 15.0,
+                                                  );
+                                                  if (selectedPoint != null) {
+                                                    osm.GeoPoint geoPoint =
+                                                        selectedPoint;
+                                                    double latitude =
+                                                        geoPoint.latitude;
+                                                    double longitude =
+                                                        geoPoint.longitude;
+                                                    setState(() {
+                                                      stops[index] = LatLng(
+                                                          latitude, longitude);
+                                                    });
+                                                    _stopNameControllers[index]
+                                                            .text =
+                                                        (await getPlaceName(
+                                                            latitude,
+                                                            longitude))!;
+                                                    _stopControllers[index]
+                                                            .text =
+                                                        geoPoint.toString();
+                                                  }
+                                                },
+                                                icon: const Icon(
+                                                    Icons.gps_not_fixed),
+                                              )),
+                                        ),
                                       ),
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.remove_circle),
-                                      onPressed: () => _removeStop(index),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                            onReorder: (int oldIndex, int newIndex) {
-                              setState(() {
-                                if (oldIndex < newIndex) {
-                                  newIndex--;
-                                }
-                                TextEditingController stopNameController =
-                                    _stopNameControllers.removeAt(oldIndex);
-                                TextEditingController stopController =
-                                    _stopControllers.removeAt(oldIndex);
-                                LatLng stop = stops.removeAt(oldIndex);
-                                _stopNameControllers.insert(
-                                    newIndex, stopNameController);
-                                _stopControllers.insert(
-                                    newIndex, stopController);
-                                stops.insert(newIndex, stop);
-                              });
-                            },
+                                      IconButton(
+                                        icon: const Icon(Icons.remove_circle),
+                                        onPressed: () => _removeStop(index),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                              onReorder: (int oldIndex, int newIndex) {
+                                setState(() {
+                                  if (oldIndex < newIndex) {
+                                    newIndex--;
+                                  }
+                                  TextEditingController stopNameController =
+                                      _stopNameControllers.removeAt(oldIndex);
+                                  TextEditingController stopController =
+                                      _stopControllers.removeAt(oldIndex);
+                                  LatLng stop = stops.removeAt(oldIndex);
+                                  _stopNameControllers.insert(
+                                      newIndex, stopNameController);
+                                  _stopControllers.insert(
+                                      newIndex, stopController);
+                                  stops.insert(newIndex, stop);
+                                });
+                              },
+                            ),
                           ),
-                        ),
                         Center(
                           child: ElevatedButton(
                             onPressed: () async {
@@ -617,25 +631,36 @@ class _EventFormState extends State<EventForm> {
                   keyboardType: TextInputType.number,
                 ),
                 const SizedBox(height: 16.0),
-                DropdownButtonFormField<Frequency>(
-                  value:
-                      Frequency.values.firstWhere((f) => f.name == _frequency),
-                  onChanged: (Frequency? newValue) {
-                    // _generateRRule();
-                    setState(() {
-                      _frequency = newValue!.name;
-                    });
+                ValueListenableBuilder<String?>(
+                  valueListenable: generatedRRuleNotifier,
+                  builder: (context, savedRRule, child) {
+                    return savedRRule != null
+                        ? Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                width: 1,
+                                color: Colors.black,
+                              ),
+                            ),
+                            child: Text(
+                              'Generated rrule: $savedRRule',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          )
+                        : const SizedBox.shrink();
                   },
-                  items: Frequency.values.map((Frequency frequency) {
-                    return DropdownMenuItem<Frequency>(
-                      value: frequency,
-                      child: Text(frequency.name),
-                    );
-                  }).toList(),
-                  decoration: const InputDecoration(
-                    labelText: 'Frequency',
-                    border: OutlineInputBorder(),
-                  ),
+                ),
+                SizedBox(
+                  height: 10,
+                ),
+                ElevatedButton(
+                  onPressed: _editRRule,
+                  child: const Text('Edit RRule'),
                 ),
                 const SizedBox(height: 16.0),
                 GestureDetector(
@@ -666,46 +691,83 @@ class _EventFormState extends State<EventForm> {
                   ),
                 ),
                 const SizedBox(height: 16.0),
-                Column(
-                  children: [
-                    Row(
-                      children: [
-                        TextFormField(
-                          controller: _tagsController,
-                          decoration: const InputDecoration(
-                            labelText: 'Tags',
-                            border: OutlineInputBorder(),
+                SizedBox(
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: _tagsController,
+                              decoration: const InputDecoration(
+                                labelText: 'Tags',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: ElevatedButton(
+                              onPressed: () {
+                                addTag(_tagsController.text);
+                                _tagsController.clear();
+                              },
+                              child: const Text("Add Tag"),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(
+                        height: 10,
+                      ),
+                      if (tags.isNotEmpty)
+                        SizedBox(
+                          height: 50,
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.max,
+                              children: [
+                                ...tags.map((tag) {
+                                  return Padding(
+                                      padding: const EdgeInsets.all(8.0),
+                                      child: Container(
+                                          decoration: const BoxDecoration(
+                                              color: Colors.green,
+                                              borderRadius: BorderRadius.all(
+                                                  Radius.circular(5))),
+                                          child: Padding(
+                                            padding: const EdgeInsets.all(6.0),
+                                            child: Row(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.stretch,
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                Text(
+                                                  tag,
+                                                  style: const TextStyle(
+                                                      color: Colors.white),
+                                                ),
+                                                IconButton(
+                                                    onPressed: () {
+                                                      removeTag(tag);
+                                                    },
+                                                    icon: const Icon(
+                                                      Icons.dangerous_outlined,
+                                                      color: Colors.white,
+                                                    ))
+                                              ],
+                                            ),
+                                          )));
+                                }),
+                              ],
+                            ),
                           ),
                         ),
-                        ElevatedButton(
-                            onPressed: () {
-                              addTag(_tagsController.text);
-                              _tagsController.clear();
-                            },
-                            child: const Text("Add Tag"))
-                      ],
-                    ),
-                    Container(
-                      height: 20,
-                      decoration: BoxDecoration(border: Border.all()),
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            ...tags.map((tag) {
-                              return ListTile(
-                                title: Text(tag),
-                                trailing: TextButton(
-                                    onPressed: () => removeTag(tag),
-                                    child:
-                                        const Icon(Icons.dangerous_outlined)),
-                              );
-                            })
-                          ],
-                        ),
-                      ),
-                    )
-                  ],
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 16.0),
                 if (widget.isAdmin)
