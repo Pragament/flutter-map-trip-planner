@@ -1,10 +1,14 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_map_trip_planner/models/event.dart';
+import 'package:flutter_map_trip_planner/providers/event_provider.dart';
 import 'package:flutter_map_trip_planner/providers/loading_provider.dart';
+import 'package:flutter_map_trip_planner/providers/location_provider.dart';
 import 'package:flutter_map_trip_planner/providers/route_provider.dart';
 import 'package:flutter_map_trip_planner/screens/route_add_stop.dart';
 
 import 'package:flutter_map_trip_planner/utilities/location_functions.dart';
+import 'package:flutter_map_trip_planner/utilities/rrule_date_calculator.dart';
 import 'package:flutter_map_trip_planner/widgets/tags_selection_dialog.dart';
 import 'package:flutter_osm_plugin/flutter_osm_plugin.dart';
 import 'package:latlong2/latlong.dart';
@@ -63,12 +67,6 @@ class _EventFormState extends State<EventForm> {
   late flutterMap.MapController flutterMapController;
   TimeOfDay? _startTime;
   TimeOfDay? _endTime;
-
-  String _frequency = 'daily'; // Example frequency value
-  int _interval = 1;
-  int _dayOfMonth = 1;
-  DateTime _untilDate = DateTime.now().add(const Duration(days: 365));
-  DateTime _startDate = DateTime.now();
 
   bool _isOnlineEvent = false;
   bool _isApprovedEvent = false;
@@ -239,6 +237,123 @@ class _EventFormState extends State<EventForm> {
         tags.remove(tag);
       });
     }
+  }
+
+// save event
+  void _saveEvent() {
+    // Get values from text controllers
+    String title = _titleController.text;
+    String description = _descriptionController.text;
+    String pincode = _pincodeController.text;
+    String phoneNumber = _phoneNumberController.text;
+    String imgUrl = _imgUrlController.text;
+    String readMoreUrl = _readMoreUrlController.text;
+    String price = _priceController.text;
+    String? generatedRRule = generatedRRuleNotifier.value;
+    String? registrationUrl = _registrationUrlController.text;
+
+    // Process tags
+    String tag = '';
+    List<dynamic> tagsList = _textfieldTagsController.getTags! as List<dynamic>;
+    if (tagsList.isNotEmpty) {
+      for (int i = 0; i < tagsList.length; i++) {
+        tag += i == tagsList.length - 1 ? tagsList[i] : '${tagsList[i]},';
+      }
+    }
+
+    // Tag validation
+    if (tag.trim().isEmpty) {
+      _showErrorDialog('Invalid Tags', 'Please enter a valid tag.');
+      return;
+    }
+
+    // Event validation
+    if (title.trim().isEmpty ||
+        phoneNumber.trim().isEmpty ||
+        description.trim().isEmpty) {
+      _showErrorDialog('Invalid Event', 'Please provide all required fields.');
+      return;
+    }
+
+    try {
+      // Calculate recurring dates if RRULE is provided
+      List<DateTime> dates = [];
+      if (generatedRRule != null && generatedRRule.isNotEmpty) {
+        RecurringDateCalculator dateCalculator =
+            RecurringDateCalculator(generatedRRule);
+        dates = dateCalculator.calculateRecurringDates();
+      }
+
+      // Create new Event
+      final newEvent = Event(
+        id: UniqueKey().toString(),
+        title: title,
+        description: description,
+        isOnline: true,
+        pincode: pincode,
+        multipleStops: stops.length > 1,
+        phoneNumber: phoneNumber,
+        imgUrl: imgUrl,
+        readMoreUrl: readMoreUrl,
+        registrationUrl: registrationUrl,
+        price: double.tryParse(price) ?? 0.0,
+        rruleString: savedRRule,
+        startTime: _startTime!,
+        endTime: _endTime!,
+        tags: tags,
+        isApproved: _isApprovedEvent,
+      );
+
+      // Add event to provider
+      Provider.of<EventProvider>(context, listen: false).addEvent(newEvent);
+
+      _showSuccessDialog('Event added!', 'Event saved successfully.');
+    } catch (e) {
+      print('Error saving event: $e');
+      _showErrorDialog('Error', 'Error saving event: $e');
+    }
+  }
+
+// Helper function to show error dialog
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(title),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Ok'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+// Helper function to show success dialog
+  void _showSuccessDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(title),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                Navigator.of(context)
+                    .pushNamedAndRemoveUntil('/allevents', (route) => false);
+              },
+              child: const Text('Ok'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -784,7 +899,7 @@ class _EventFormState extends State<EventForm> {
                 ElevatedButton(
                   onPressed: () {
                     if (_formKey.currentState!.validate()) {
-                      // Form submission logic here
+                      _saveEvent();
                     }
                   },
                   child: const Text('Submit'),
