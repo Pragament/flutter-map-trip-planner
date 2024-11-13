@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_map_trip_planner/data/evens_data.dart';
-import 'package:flutter_map_trip_planner/models/event.dart';
+
 import 'package:flutter_map_trip_planner/providers/event_provider.dart';
 import 'package:flutter_map_trip_planner/providers/location_provider.dart';
 import 'package:flutter_map_trip_planner/screens/event_creation_form.dart';
@@ -13,15 +12,16 @@ class EventListView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    //  final eventProvider = Provider.of<EventProvider>(context);
-    // final events = eventProvider.events;
+    final eventProvider = Provider.of<EventProvider>(context);
+    final events = eventProvider.events;
     final cl = Provider.of<LocationProvider>(context).currentLocation;
 
     return Scaffold(
       body: ListView.builder(
-        itemCount: dummyEvents.length,
+        itemCount: events.length,
         itemBuilder: (context, index) {
-          final event = dummyEvents[index];
+          final event = events[index];
+
           return Card(
             margin: EdgeInsets.all(8.0),
             child: ListTile(
@@ -43,6 +43,7 @@ class EventListView extends StatelessWidget {
                       builder: (context) => EventForm(
                         isAdmin: isAdmin,
                         currentLocationData: cl,
+                        event: event,
                       ),
                     ),
                   );

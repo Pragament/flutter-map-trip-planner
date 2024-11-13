@@ -30,10 +30,14 @@ enum Frequency {
 
 class EventForm extends StatefulWidget {
   final bool isAdmin;
+  final Event? event;
 
   EventForm(
-      {required this.currentLocationData, required this.isAdmin, super.key});
-  late LocationData? currentLocationData;
+      {required this.currentLocationData,
+      required this.isAdmin,
+      this.event,
+      super.key});
+  LocationData? currentLocationData;
 
   @override
   _EventFormState createState() => _EventFormState();
@@ -55,6 +59,7 @@ class _EventFormState extends State<EventForm> {
   late TextEditingController _startTimeController;
   late TextEditingController _endTimeController;
   late TextEditingController _tagsController;
+
   final List<TextEditingController> _stopControllers = [];
   final List<TextEditingController> _stopNameControllers = [];
   List<Map<String, dynamic>> displayedUserAddedStops = [];
@@ -65,8 +70,8 @@ class _EventFormState extends State<EventForm> {
   List<String> tags = [];
   late TextfieldTagsController _textfieldTagsController;
   late flutterMap.MapController flutterMapController;
-  TimeOfDay? _startTime;
-  TimeOfDay? _endTime;
+  TimeOfDay _startTime = TimeOfDay(hour: 10, minute: 10);
+  TimeOfDay _endTime = TimeOfDay(hour: 10, minute: 10);
 
   bool _isOnlineEvent = false;
   bool _isApprovedEvent = false;
@@ -93,28 +98,92 @@ class _EventFormState extends State<EventForm> {
     _startTimeController = TextEditingController();
     _endTimeController = TextEditingController();
     _tagsController = TextEditingController();
-
     _textfieldTagsController = TextfieldTagsController();
-    marker = flutterMap.Marker(
-      width: 80.0,
-      height: 80.0,
-      point: LatLng(widget.currentLocationData!.latitude!,
-          widget.currentLocationData!.longitude!),
-      child: const Icon(
-        Icons.circle_sharp,
-        color: Colors.blue,
-        size: 16,
-      ),
-    );
+  }
 
-    osm.GeoPoint geoPoint = osm.GeoPoint(
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    // Populate form if editing
+    _populateFormIfEditing();
+
+    // Initialize map components after dependencies are available
+    _initializeMapComponents();
+  }
+
+  void _populateFormIfEditing() {
+    if (widget.event != null) {
+      final event = widget.event!;
+      _titleController.text = event.title;
+      _descriptionController.text = event.description;
+      _pincodeController.text = event.pincode ?? '';
+      _idController.text = event.id;
+      _phoneNumberController.text = event.phoneNumber;
+      _imgUrlController.text = event.imgUrl;
+      _readMoreUrlController.text = event.readMoreUrl;
+      _registrationUrlController.text = event.registrationUrl;
+      _priceController.text = event.price.toString();
+      if (event.schedule.toString().isNotEmpty) {
+        savedRRule = event.schedule.toString();
+        generatedRRuleNotifier.value = event.schedule.toString();
+      }
+      _startTime = event.startTime;
+      _endTime = event.endTime;
+      _startTimeController.text = event.startTime.format(context);
+      _endTimeController.text = event.endTime.format(context);
+      _isOnlineEvent = event.isOnline;
+      _isApprovedEvent = event.isApproved;
+      tags = List<String>.from(event.tags);
+
+      // If the event has stops, populate them
+      if (event.stops != null && event.stops!.isNotEmpty) {
+        stops = [];
+        for (var stop in event.stops!) {
+          // Assuming stop is a string representing coordinates like "latitude,longitude"
+          var coordinates = stop.split(',');
+          if (coordinates.length == 2) {
+            double lat = double.tryParse(coordinates[0]) ?? 0.0;
+            double lon = double.tryParse(coordinates[1]) ?? 0.0;
+            stops.add(LatLng(lat, lon));
+          }
+
+          _stopControllers.add(TextEditingController(text: stop));
+          _stopNameControllers.add(TextEditingController(text: stop));
+        }
+      }
+    }
+  }
+
+  void _initializeMapComponents() {
+    if (widget.currentLocationData != null) {
+      marker = flutterMap.Marker(
+        width: 80.0,
+        height: 80.0,
+        point: LatLng(
+          widget.currentLocationData!.latitude!,
+          widget.currentLocationData!.longitude!,
+        ),
+        child: const Icon(
+          Icons.circle_sharp,
+          color: Colors.blue,
+          size: 16,
+        ),
+      );
+
+      osm.GeoPoint geoPoint = osm.GeoPoint(
         latitude: widget.currentLocationData!.latitude!,
-        longitude: widget.currentLocationData!.longitude!);
-    //  _stopNameControllers.add(TextEditingController(text: widget.locationName));
-    _stopControllers.add(TextEditingController(text: geoPoint.toString()));
-    flutterMapController = flutterMap.MapController();
-    stops.add(LatLng(widget.currentLocationData!.latitude!,
-        widget.currentLocationData!.longitude!));
+        longitude: widget.currentLocationData!.longitude!,
+      );
+
+      _stopControllers.add(TextEditingController(text: geoPoint.toString()));
+      flutterMapController = flutterMap.MapController();
+
+      stops.add(LatLng(
+        widget.currentLocationData!.latitude!,
+        widget.currentLocationData!.longitude!,
+      ));
+    }
   }
 
   void _removeStop(int index) {
@@ -248,30 +317,28 @@ class _EventFormState extends State<EventForm> {
     String phoneNumber = _phoneNumberController.text;
     String imgUrl = _imgUrlController.text;
     String readMoreUrl = _readMoreUrlController.text;
+    String registrationUrl = _registrationUrlController.text;
     String price = _priceController.text;
     String? generatedRRule = generatedRRuleNotifier.value;
-    String? registrationUrl = _registrationUrlController.text;
 
-    // Process tags
-    String tag = '';
-    List<dynamic> tagsList = _textfieldTagsController.getTags! as List<dynamic>;
-    if (tagsList.isNotEmpty) {
-      for (int i = 0; i < tagsList.length; i++) {
-        tag += i == tagsList.length - 1 ? tagsList[i] : '${tagsList[i]},';
-      }
-    }
-
-    // Tag validation
-    if (tag.trim().isEmpty) {
-      _showErrorDialog('Invalid Tags', 'Please enter a valid tag.');
+    // Validate required fields
+    if (title.isEmpty || phoneNumber.isEmpty || description.isEmpty) {
+      _showErrorDialog('Invalid Event',
+          'Please provide all required fields:\n- Title\n- Phone Number\n- Description');
       return;
     }
 
-    // Event validation
-    if (title.trim().isEmpty ||
-        phoneNumber.trim().isEmpty ||
-        description.trim().isEmpty) {
-      _showErrorDialog('Invalid Event', 'Please provide all required fields.');
+    // Validate phone number format
+    if (!RegExp(r'^\+?[\d\s-]+$').hasMatch(phoneNumber)) {
+      _showErrorDialog(
+          'Invalid Phone Number', 'Please enter a valid phone number');
+      return;
+    }
+
+    // Validate price format if provided
+    if (price.isNotEmpty && double.tryParse(price) == null) {
+      _showErrorDialog(
+          'Invalid Price', 'Please enter a valid number for price');
       return;
     }
 
@@ -284,12 +351,13 @@ class _EventFormState extends State<EventForm> {
         dates = dateCalculator.calculateRecurringDates();
       }
 
-      // Create new Event
-      final newEvent = Event(
-        id: UniqueKey().toString(),
+      // Prepare event data
+      final event = Event(
+        // Use existing ID if editing, create new one if creating
+        id: widget.event?.id ?? UniqueKey().toString(),
         title: title,
         description: description,
-        isOnline: true,
+        isOnline: _isOnlineEvent,
         pincode: pincode,
         multipleStops: stops.length > 1,
         phoneNumber: phoneNumber,
@@ -298,19 +366,34 @@ class _EventFormState extends State<EventForm> {
         registrationUrl: registrationUrl,
         price: double.tryParse(price) ?? 0.0,
         rruleString: savedRRule,
-        startTime: _startTime!,
-        endTime: _endTime!,
-        tags: tags,
+        startTime: _startTime,
+        endTime: _endTime,
+        tags: List<String>.from(
+            tags), // Create a new list to avoid reference issues
         isApproved: _isApprovedEvent,
+        stops: stops
+            .map((stop) => '${stop.latitude},${stop.longitude}')
+            .toList(), // Create a new list of stops
       );
 
-      // Add event to provider
-      Provider.of<EventProvider>(context, listen: false).addEvent(newEvent);
+      final eventProvider = Provider.of<EventProvider>(context, listen: false);
 
-      _showSuccessDialog('Event added!', 'Event saved successfully.');
+      // Update or create based on whether we're editing
+      if (widget.event != null ) {
+        eventProvider.updateEvent(event.id, event);
+        _showSuccessDialog(
+            'Event Updated', 'The event has been successfully updated.'  );
+    
+      } else {
+        eventProvider.addEvent(event);
+        _showSuccessDialog(
+            'Event Created', 'The event has been successfully created.');
+       
+      }
     } catch (e) {
       print('Error saving event: $e');
-      _showErrorDialog('Error', 'Error saving event: $e');
+      _showErrorDialog(
+          'Error', 'An error occurred while saving the event: ${e.toString()}');
     }
   }
 
@@ -793,7 +876,9 @@ class _EventFormState extends State<EventForm> {
                 ),
                 const SizedBox(height: 16.0),
                 GestureDetector(
-                  onTap: () => _selectTime(context, false),
+                  onTap: () {
+                    _selectTime(context, false);
+                  },
                   child: AbsorbPointer(
                     child: TextFormField(
                       controller: _endTimeController,
