@@ -95,4 +95,10 @@ class EventProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  void toggleApproval(String eventId) {
+    final event = events.firstWhere((event) => event.id == eventId);
+    event.isApproved = !event.isApproved;
+    notifyListeners(); // Notify listeners to update the UI
+  }
 }

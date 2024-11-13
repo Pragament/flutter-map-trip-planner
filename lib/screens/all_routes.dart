@@ -1471,7 +1471,9 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen>
                                             }
                                           },
                                         ),
-                                      EventListView(isAdmin: isAdmin),
+                                      EventListView(
+                                        isAdmin: isAdmin,
+                                      ),
                                     ],
                                   ),
                                 ),
