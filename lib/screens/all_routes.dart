@@ -4,7 +4,10 @@ import 'dart:io';
 
 import 'package:flutter_map_trip_planner/miscellaenous/add_route_to_firebase.dart';
 import 'package:flutter_map_trip_planner/miscellaenous/save_user_location.dart';
+import 'package:flutter_map_trip_planner/providers/event_provider.dart';
 import 'package:flutter_map_trip_planner/providers/location_provider.dart';
+import 'package:flutter_map_trip_planner/screens/all_events.dart';
+import 'package:flutter_map_trip_planner/screens/event_creation_form.dart';
 import 'package:flutter_map_trip_planner/screens/route_add_stop.dart';
 import 'package:flutter_map_trip_planner/widgets/filter_item.dart';
 import 'package:flutter/material.dart';
@@ -57,7 +60,7 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen>
   String? centeredRouteId;
 
   bool hasSkippedLogin = false;
-
+  bool isAdmin = true;
 
   // List<Map<String, dynamic>> filteredUserStops = [];
   List<dynamic> filteredUserRoutes = [];
@@ -80,6 +83,7 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen>
   late StreamSubscription<LocationData> locationStreamSubscription;
   late Marker marker;
   List<TextEditingController> filterStopsController = [];
+  //dummy data for current location
 
   @override
   void initState() {
@@ -103,13 +107,13 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen>
       askForDisplayOverApps();
     });
     _checkSkipLoginState();
-
   }
 
   Future<void> _checkSkipLoginState() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     setState(() {
-      hasSkippedLogin = prefs.getBool('skip_login') ?? false; // Default to false if not set
+      hasSkippedLogin =
+          prefs.getBool('skip_login') ?? false; // Default to false if not set
     });
   }
 
@@ -947,10 +951,10 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen>
                   return Center(child: Text('Error: ${snapshot.error}'));
                 } else {
                   LatLng? initialCenter;
-                  return Consumer3<RouteProvider, FiltersProvider,
-                          LoadingProvider>(
+                  return Consumer4<RouteProvider, FiltersProvider,
+                          LoadingProvider, EventProvider>(
                       builder: (context, routeProvider, filtersProvider,
-                          loadingProvider, child) {
+                          loadingProvider, eventProvider, child) {
                     filteredUserRoutes = [];
                     filteredRouteStopsMap = {};
                     bool isFiltered = true;
@@ -975,8 +979,8 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen>
                             : const SizedBox.shrink(),
                         showFiltersCheckList(
                             currentLocation, initialCenter, routeProvider),
-                        Expanded(
-                          flex: 6,
+                        SizedBox(
+                          height: 300,
                           child: Stack(
                             children: [
                               Consumer<RouteProvider>(
@@ -1173,233 +1177,310 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen>
                             ],
                           ),
                         ),
-                        if (filteredRouteStopsMap.isEmpty &&
-                            routeProvider.userStops.isEmpty)
-                          const Expanded(
-                            flex: 4,
-                            child: Center(
-                              child: Text(
-                                'No routes and stops are added',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.w500, fontSize: 20),
-                              ),
-                            ),
-                          ),
-                        if (filteredRouteStopsMap.isNotEmpty ||
-                            routeProvider.userStops.isNotEmpty)
-                          Expanded(
-                            flex: 4,
-                            child: ListView.builder(
-                              itemCount: filteredRouteStopsMap.length +
-                                  (routeProvider.userStops.length),
-                              itemBuilder: (context, index) {
-                                if (index < filteredRouteStopsMap.length) {
-                                  var routeName = filteredRouteStopsMap.keys
-                                      .toList()[index];
-                                  var routePoints =
-                                      filteredRouteStopsMap[routeName]!;
-                                  var tags = '';
-                                  for (var element in filteredUserRoutes) {
-                                    if (element['routeName'] == routeName) {
-                                      tags = element['tags'];
-                                    }
-                                  }
-                                  bool isTagSelected = false;
-                                  for (final tag in selectedTags) {
-                                    if (tags.split(',').contains(tag) ||
-                                        tag == 'All') {
-                                      isTagSelected = true;
-                                      break;
-                                    }
-                                  }
-                                  if (selectedTags.isEmpty) {
-                                    isTagSelected = true;
-                                  }
-                                  if (!isTagSelected) {
-                                    return const SizedBox.shrink();
-                                  }
-                                  LatLng? initialPoint;
-                                  return ListTile(
-                                    title: SingleChildScrollView(
-                                      scrollDirection: Axis.horizontal,
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text(
-                                            routeName,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 5),
-                                          Text(
-                                            '(tags: $tags)',
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    subtitle: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        if (routeProvider.routeStopsNames[
-                                                    routeName] ==
-                                                null ||
-                                            routeProvider
-                                                .routeStopsNames[routeName]!
-                                                .isEmpty)
-                                          const Text(
-                                            'Loading...',
+
+                        //event route tab bar
+
+                        SizedBox(
+                          height: 400,
+                          child: DefaultTabController(
+                            length: 2, // Number of tabs
+                            child: Column(
+                              children: [
+                                const TabBar(
+                                  labelColor: Colors.blue,
+                                  unselectedLabelColor: Colors.grey,
+                                  indicatorColor: Colors.blue,
+                                  tabs: [
+                                    Tab(text: "Routes"),
+                                    Tab(text: "Events"),
+                                  ],
+                                ),
+                                Expanded(
+                                  child: TabBarView(
+                                    children: [
+                                      if (filteredRouteStopsMap.isEmpty &&
+                                          routeProvider.userStops.isEmpty)
+                                        const Center(
+                                          child: Text(
+                                            'No routes and stops are added',
                                             style: TextStyle(
-                                              fontWeight: FontWeight.w500,
-                                            ),
+                                                fontWeight: FontWeight.w500,
+                                                fontSize: 20),
                                           ),
-                                        if (routeProvider
-                                                .routeStopsNames[routeName] !=
-                                            null)
-                                          for (int stop = 0;
-                                              stop <
-                                                  routeProvider
-                                                      .routeStopsNames[
-                                                          routeName]!
-                                                      .length;
-                                              stop++)
-                                            Text(
-                                              'Point ${stop + 1} : ${routeProvider.routeStopsNames[routeName]![stop]}',
-                                            ),
-                                      ],
-                                    ),
-                                    onTap: () {
-                                      initialPoint = routePoints[0];
-                                      setState(() {
-                                        selectedRouteId = routeName;
-                                        flutterMapController.move(
-                                            LatLng(initialPoint!.latitude,
-                                                initialPoint!.longitude),
-                                            14);
-                                      });
-                                    },
-                                    trailing: showMenuPopUp(
-                                        context, routeName, currentLocation),
-                                    selected: selectedRouteId == routeName,
-                                    tileColor: selectedRouteId == routeName
-                                        ? Colors.grey
-                                        : null,
-                                  );
-                                } else {
-                                  // For user-added stops
-                                  if (routeProvider.userStops.isNotEmpty) {
-                                    var userStop = routeProvider.userStops[
-                                        index - filteredUserRoutes.length];
-                                    var tags = userStop['tags'].split(',');
-                                    bool isTagSelected = false;
-                                    for (final tag in selectedTags) {
-                                      if (tags.contains(tag) || tag == 'All') {
-                                        isTagSelected = true;
-                                        break;
-                                      }
-                                    }
-                                    if (selectedTags.isEmpty) {
-                                      isTagSelected = true;
-                                    }
-                                    if (!isTagSelected) {
-                                      return const SizedBox.shrink();
-                                    }
-                                    return ListTile(
-                                      title: Text(
-                                        userStop['stop'],
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
                                         ),
-                                      ),
-                                      subtitle: Text(
-                                        'Tags: ${userStop['tags']}',
-                                      ),
-                                      onTap: () {
-                                        setState(() {
-                                          flutterMapController.move(
-                                              routeProvider.userStops[index -
-                                                      filteredUserRoutes.length]
-                                                  ['point'],
-                                              14);
-                                          centeredRouteId = null;
-                                        });
-                                      },
-                                      trailing: PopupMenuButton(
-                                        itemBuilder: (BuildContext context) {
-                                          return [
-                                            PopupMenuItem(
-                                              onTap: () async {
-                                                List<String> stopTags =
-                                                    (userStop['tags'] as String)
-                                                        .split(',');
-                                                await Navigator.of(context)
-                                                    .push(
-                                                  MaterialPageRoute(
-                                                    builder: (ctx) =>
-                                                        AddStopScreen(
-                                                      filteredTags: stopTags,
-                                                      allTags: allTagsList,
-                                                      currentLocationData:
-                                                          LocationData.fromMap({
-                                                        'latitude': userStop[
-                                                                'selectedPoint']
-                                                            .latitude,
-                                                        'longitude': userStop[
-                                                                'selectedPoint']
-                                                            .longitude,
-                                                      }),
-                                                      locationName:
-                                                          userStop['stop'],
-                                                      isEdit: true,
-                                                      index: index -
-                                                          filteredUserRoutes
-                                                              .length,
+                                      if (filteredRouteStopsMap.isNotEmpty ||
+                                          routeProvider.userStops.isNotEmpty)
+                                        ListView.builder(
+                                          itemCount: filteredRouteStopsMap
+                                                  .length +
+                                              (routeProvider.userStops.length),
+                                          itemBuilder: (context, index) {
+                                            if (index <
+                                                filteredRouteStopsMap.length) {
+                                              var routeName =
+                                                  filteredRouteStopsMap.keys
+                                                      .toList()[index];
+                                              var routePoints =
+                                                  filteredRouteStopsMap[
+                                                      routeName]!;
+                                              var tags = '';
+                                              for (var element
+                                                  in filteredUserRoutes) {
+                                                if (element['routeName'] ==
+                                                    routeName) {
+                                                  tags = element['tags'];
+                                                }
+                                              }
+                                              bool isTagSelected = false;
+                                              for (final tag in selectedTags) {
+                                                if (tags
+                                                        .split(',')
+                                                        .contains(tag) ||
+                                                    tag == 'All') {
+                                                  isTagSelected = true;
+                                                  break;
+                                                }
+                                              }
+                                              if (selectedTags.isEmpty) {
+                                                isTagSelected = true;
+                                              }
+                                              if (!isTagSelected) {
+                                                return const SizedBox.shrink();
+                                              }
+                                              LatLng? initialPoint;
+                                              return ListTile(
+                                                title: SingleChildScrollView(
+                                                  scrollDirection:
+                                                      Axis.horizontal,
+                                                  child: Row(
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
+                                                    children: [
+                                                      Text(
+                                                        routeName,
+                                                        style: const TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                        ),
+                                                      ),
+                                                      const SizedBox(width: 5),
+                                                      Text(
+                                                        '(tags: $tags)',
+                                                        style: const TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                                subtitle: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    if (routeProvider
+                                                                    .routeStopsNames[
+                                                                routeName] ==
+                                                            null ||
+                                                        routeProvider
+                                                            .routeStopsNames[
+                                                                routeName]!
+                                                            .isEmpty)
+                                                      const Text(
+                                                        'Loading...',
+                                                        style: TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.w500,
+                                                        ),
+                                                      ),
+                                                    if (routeProvider
+                                                                .routeStopsNames[
+                                                            routeName] !=
+                                                        null)
+                                                      for (int stop = 0;
+                                                          stop <
+                                                              routeProvider
+                                                                  .routeStopsNames[
+                                                                      routeName]!
+                                                                  .length;
+                                                          stop++)
+                                                        Text(
+                                                          'Point ${stop + 1} : ${routeProvider.routeStopsNames[routeName]![stop]}',
+                                                        ),
+                                                  ],
+                                                ),
+                                                onTap: () {
+                                                  initialPoint = routePoints[0];
+                                                  setState(() {
+                                                    selectedRouteId = routeName;
+                                                    flutterMapController.move(
+                                                        LatLng(
+                                                            initialPoint!
+                                                                .latitude,
+                                                            initialPoint!
+                                                                .longitude),
+                                                        14);
+                                                  });
+                                                },
+                                                trailing: showMenuPopUp(context,
+                                                    routeName, currentLocation),
+                                                selected: selectedRouteId ==
+                                                    routeName,
+                                                tileColor:
+                                                    selectedRouteId == routeName
+                                                        ? Colors.grey
+                                                        : null,
+                                              );
+                                            } else {
+                                              // For user-added stops
+                                              if (routeProvider
+                                                  .userStops.isNotEmpty) {
+                                                var userStop =
+                                                    routeProvider.userStops[
+                                                        index -
+                                                            filteredUserRoutes
+                                                                .length];
+                                                var tags =
+                                                    userStop['tags'].split(',');
+                                                bool isTagSelected = false;
+                                                for (final tag
+                                                    in selectedTags) {
+                                                  if (tags.contains(tag) ||
+                                                      tag == 'All') {
+                                                    isTagSelected = true;
+                                                    break;
+                                                  }
+                                                }
+                                                if (selectedTags.isEmpty) {
+                                                  isTagSelected = true;
+                                                }
+                                                if (!isTagSelected) {
+                                                  return const SizedBox
+                                                      .shrink();
+                                                }
+                                                return ListTile(
+                                                  title: Text(
+                                                    userStop['stop'],
+                                                    style: const TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
                                                     ),
                                                   ),
+                                                  subtitle: Text(
+                                                    'Tags: ${userStop['tags']}',
+                                                  ),
+                                                  onTap: () {
+                                                    setState(() {
+                                                      flutterMapController.move(
+                                                          routeProvider
+                                                                      .userStops[
+                                                                  index -
+                                                                      filteredUserRoutes
+                                                                          .length]
+                                                              ['point'],
+                                                          14);
+                                                      centeredRouteId = null;
+                                                    });
+                                                  },
+                                                  trailing: PopupMenuButton(
+                                                    itemBuilder:
+                                                        (BuildContext context) {
+                                                      return [
+                                                        PopupMenuItem(
+                                                          onTap: () async {
+                                                            List<String>
+                                                                stopTags =
+                                                                (userStop['tags']
+                                                                        as String)
+                                                                    .split(',');
+                                                            await Navigator.of(
+                                                                    context)
+                                                                .push(
+                                                              MaterialPageRoute(
+                                                                builder: (ctx) =>
+                                                                    AddStopScreen(
+                                                                  filteredTags:
+                                                                      stopTags,
+                                                                  allTags:
+                                                                      allTagsList,
+                                                                  currentLocationData:
+                                                                      LocationData
+                                                                          .fromMap({
+                                                                    'latitude':
+                                                                        userStop['selectedPoint']
+                                                                            .latitude,
+                                                                    'longitude':
+                                                                        userStop['selectedPoint']
+                                                                            .longitude,
+                                                                  }),
+                                                                  locationName:
+                                                                      userStop[
+                                                                          'stop'],
+                                                                  isEdit: true,
+                                                                  index: index -
+                                                                      filteredUserRoutes
+                                                                          .length,
+                                                                ),
+                                                              ),
+                                                            );
+                                                          },
+                                                          child: const Text(
+                                                              'Edit'),
+                                                        ),
+                                                        PopupMenuItem(
+                                                          onTap: () {
+                                                            routeProvider
+                                                                .deleteStop(index -
+                                                                    filteredUserRoutes
+                                                                        .length);
+                                                            removeStopFromFirebase();
+                                                          },
+                                                          child: const Text(
+                                                              'Delete'),
+                                                        ),
+                                                        PopupMenuItem(
+                                                          onTap: () {
+                                                            List<LatLng> stops =
+                                                                [
+                                                              LatLng(
+                                                                  currentLocation
+                                                                      .data!
+                                                                      .latitude!,
+                                                                  currentLocation
+                                                                      .data!
+                                                                      .longitude!),
+                                                              userStop[
+                                                                  'selectedPoint']
+                                                            ];
+                                                            _startNavigation(
+                                                                stops);
+                                                          },
+                                                          child: const Text(
+                                                              'Navigate'),
+                                                        ),
+                                                      ];
+                                                    },
+                                                  ),
                                                 );
-                                              },
-                                              child: const Text('Edit'),
-                                            ),
-                                            PopupMenuItem(
-                                              onTap: () {
-                                                routeProvider.deleteStop(index -
-                                                    filteredUserRoutes.length);
-                                                removeStopFromFirebase();
-                                              },
-                                              child: const Text('Delete'),
-                                            ),
-                                            PopupMenuItem(
-                                              onTap: () {
-                                                List<LatLng> stops = [
-                                                  LatLng(
-                                                      currentLocation
-                                                          .data!.latitude!,
-                                                      currentLocation
-                                                          .data!.longitude!),
-                                                  userStop['selectedPoint']
-                                                ];
-                                                _startNavigation(stops);
-                                              },
-                                              child: const Text('Navigate'),
-                                            ),
-                                          ];
-                                        },
+                                              } else {
+                                                return const ListTile(
+                                                  title: Text(
+                                                      'No user-added stops available'),
+                                                );
+                                              }
+                                            }
+                                          },
+                                        ),
+                                      EventListView(
+                                        isAdmin: isAdmin,
                                       ),
-                                    );
-                                  } else {
-                                    return const ListTile(
-                                      title:
-                                          Text('No user-added stops available'),
-                                    );
-                                  }
-                                }
-                              },
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
+                        ),
                       ],
                     );
                   });
@@ -1409,11 +1490,12 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen>
             floatingActionButton: hasSkippedLogin
                 ? null // Hide the button if user has skipped login
                 : FloatingActionButtonCustom(
-              selectedTags: selectedTags,
-              locationName: locationName,
-              allTagsList: allTagsList,
-              cl: currentLocation,
-            ),
+                    selectedTags: selectedTags,
+                    locationName: locationName,
+                    allTagsList: allTagsList,
+                    cl: currentLocation,
+                    isAdmin: isAdmin,
+                  ),
           );
         });
   }
@@ -1615,71 +1697,75 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen>
           return Row(
             mainAxisAlignment: MainAxisAlignment.start,
             children: [
-              index < isSelected.length?
-              Checkbox(
-                value: isSelected[index],
-                onChanged: (isChecked) {
-                  if (isChecked!) {
-                    if (allTagsList[index] == 'All') {
-                      setState(() {
-                        selectedTags = ['All'];
-                      });
-                    } else {
-                      selectedTags.add(allTagsList[index]);
-                    }
-                    setState(() {
-                      isSelected[index] = isChecked;
-                    });
-                  } else {
-                    setState(() {
-                      isSelected[index] = isChecked;
-                      selectedTags.remove(allTagsList[index]);
-                    });
-                  }
-                  int count = 0;
-                  List<LatLng?> initialCenterList =
-                      filteredRouteStopsMap.isEmpty
-                          ? []
-                          : selectedTags.isEmpty
-                              ? [
-                                  LatLng(currentLocation.data!.latitude!,
-                                      currentLocation.data!.longitude!)
-                                ]
-                              : filteredRouteStopsMap.entries.map((e) {
-                                  if (e.key.trim() == selectedTags[0].trim()) {
-                                    if (count == 0) {
-                                      return filteredRouteStopsMap[e.key]?[0];
+              index < isSelected.length
+                  ? Checkbox(
+                      value: isSelected[index],
+                      onChanged: (isChecked) {
+                        if (isChecked!) {
+                          if (allTagsList[index] == 'All') {
+                            setState(() {
+                              selectedTags = ['All'];
+                            });
+                          } else {
+                            selectedTags.add(allTagsList[index]);
+                          }
+                          setState(() {
+                            isSelected[index] = isChecked;
+                          });
+                        } else {
+                          setState(() {
+                            isSelected[index] = isChecked;
+                            selectedTags.remove(allTagsList[index]);
+                          });
+                        }
+                        int count = 0;
+                        List<LatLng?> initialCenterList = filteredRouteStopsMap
+                                .isEmpty
+                            ? []
+                            : selectedTags.isEmpty
+                                ? [
+                                    LatLng(currentLocation.data!.latitude!,
+                                        currentLocation.data!.longitude!)
+                                  ]
+                                : filteredRouteStopsMap.entries.map((e) {
+                                    if (e.key.trim() ==
+                                        selectedTags[0].trim()) {
+                                      if (count == 0) {
+                                        return filteredRouteStopsMap[e.key]?[0];
+                                      }
+                                      count++;
                                     }
-                                    count++;
-                                  }
-                                }).toList();
-                  count = 0;
-                  if (initialCenterList[0] != null) {
-                    initialCenter = initialCenterList[0];
-                    setState(() {
-                      flutterMapController.move(initialCenterList[0]!, 14);
-                    });
-                  } else {
-                    if (routeProvider.userStops.isNotEmpty) {
-                      routeProvider.userStops.map((value) {
-                        if (value['tags'].toString().trim() ==
-                            selectedTags[0].trim()) {
-                          if (count == 0) {
-                            value.entries.map((e) async {
-                              initialCenter = value['point'];
-                              setState(() {
-                                flutterMapController.move(initialCenter!, 14);
-                              });
+                                  }).toList();
+                        count = 0;
+                        if (initialCenterList[0] != null) {
+                          initialCenter = initialCenterList[0];
+                          setState(() {
+                            flutterMapController.move(
+                                initialCenterList[0]!, 14);
+                          });
+                        } else {
+                          if (routeProvider.userStops.isNotEmpty) {
+                            routeProvider.userStops.map((value) {
+                              if (value['tags'].toString().trim() ==
+                                  selectedTags[0].trim()) {
+                                if (count == 0) {
+                                  value.entries.map((e) async {
+                                    initialCenter = value['point'];
+                                    setState(() {
+                                      flutterMapController.move(
+                                          initialCenter!, 14);
+                                    });
+                                  }).toList();
+                                }
+                                count++;
+                              }
+                              count = 0;
                             }).toList();
                           }
-                          count++;
                         }
-                        count = 0;
-                      }).toList();
-                    }
-                  }
-                },
-              ): SizedBox(),
+                      },
+                    )
+                  : const SizedBox(),
               Text(allTagsList[index]),
             ],
           );
@@ -1826,12 +1912,14 @@ class FloatingActionButtonCustom extends StatelessWidget {
     required this.locationName,
     required this.allTagsList,
     required this.cl,
+    required this.isAdmin,
   });
 
   final List<String> selectedTags;
   final String? locationName;
   final List<String> allTagsList;
   final AsyncSnapshot<LocationData> cl;
+  final bool isAdmin;
 
   @override
   Widget build(BuildContext context) {
@@ -1940,7 +2028,59 @@ class FloatingActionButtonCustom extends StatelessWidget {
                     ),
             );
           },
-        )
+        ),
+        const SizedBox(
+          width: 16,
+        ),
+        if (isAdmin)
+          Consumer<LoadingProvider>(
+            builder:
+                (BuildContext context, LoadingProvider value, Widget? child) {
+              return FloatingActionButton(
+                heroTag: null,
+                mini: true,
+                onPressed: value.locationLoading
+                    ? () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text("Loading... Please wait"),
+                            action: SnackBarAction(
+                              label: 'Ok',
+                              onPressed:
+                                  ScaffoldMessenger.of(context).clearSnackBars,
+                            ),
+                          ),
+                        );
+                      }
+                    : () async {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => EventForm(
+                              currentLocationData: cl.data,
+                              isAdmin: true,
+                            ),
+                          ),
+                        );
+                      },
+                backgroundColor: Colors.green,
+                child: value.locationLoading
+                    ? const Center(
+                        child: SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                          ),
+                        ),
+                      )
+                    : const Icon(
+                        Icons.add,
+                        color: Colors.white,
+                      ),
+              );
+            },
+          ),
       ],
     );
   }

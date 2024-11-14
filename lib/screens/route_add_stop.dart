@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flutter_osm_interface/flutter_osm_interface.dart' as osm;
@@ -42,7 +43,9 @@ class _RouteAddStopScreenState extends State<RouteAddStopScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       resizeToAvoidBottomInset: true,
-      appBar: AppBar( foregroundColor:Colors.white, backgroundColor:Colors.green,
+      appBar: AppBar(
+        foregroundColor: Colors.white,
+        backgroundColor: Colors.green,
         title: const Text('Choose Destination'),
       ),
       body: Container(
@@ -137,7 +140,7 @@ class _RouteAddStopScreenState extends State<RouteAddStopScreen> {
                               place, widget.currentLocationData);
                         });
                       },
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         hintText: 'Enter Stop Name',
                         // suffixIcon: InkWell(
                         //   onTap: () async {

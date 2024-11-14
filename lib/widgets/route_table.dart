@@ -1,6 +1,8 @@
 // import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_map_trip_planner/screens/route_creation_screen.dart';
+import 'package:location/location.dart';
 
 import 'package:provider/provider.dart';
 import '../providers/route_provider.dart';
@@ -18,6 +20,7 @@ class RouteTable extends StatefulWidget {
 
 class _RouteTableState extends State<RouteTable> {
   List<dynamic>? _routes;
+  late LocationData samplelLocationData;
 
   void _fetchRoutes() {
     _routes = Provider.of<RouteProvider>(context, listen: false).userRoutes;
@@ -28,6 +31,25 @@ class _RouteTableState extends State<RouteTable> {
     // listenToNotifications();
     super.initState();
     _fetchRoutes();
+    // Map<String, dynamic> sampleLocationMap = {
+    //   'latitude': 37.7749,
+    //   'longitude': -122.4194,
+    //   'accuracy': 5.0,
+    //   'altitude': 10.0,
+    //   'speed': 0.0,
+    //   'speed_accuracy': 0.0,
+    //   'heading': 0.0,
+    //   'time': DateTime.now().millisecondsSinceEpoch.toDouble(),
+    //   'isMock': false,
+    //   'verticalAccuracy': 5.0,
+    //   'headingAccuracy': 1.0,
+    //   'elapsedRealtimeNanos': 0.0,
+    //   'elapsedRealtimeUncertaintyNanos': 0.0,
+    //   'satelliteNumber': 0,
+    //   'provider': 'gps',
+    // };
+
+    // samplelLocationData = LocationData.fromMap(sampleLocationMap);
   }
 
   // void _sendNotificationIfNearestDateIsToday() {
@@ -156,21 +178,31 @@ class _RouteTableState extends State<RouteTable> {
           : const Center(
               child: CircularProgressIndicator(),
             ),
-      // floatingActionButton: FloatingActionButton(
-      //   backgroundColor: Colors.green,
-      //   child: const Icon(
-      //     Icons.add,
-      //     color: Colors.white,
-      //   ),
-      //   onPressed: () {
-      //     Navigator.push(
-      //       context,
-      //       MaterialPageRoute(
-      //         builder: (context) => RouteCreationScreen(),
-      //       ),
-      //     );
-      //   },
-      // ),
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: Colors.green,
+        child: const Icon(
+          Icons.add,
+          color: Colors.white,
+        ),
+        onPressed: () {
+          // TODO create a form creation screen
+          // Navigator.push(
+          //   context,
+          //   MaterialPageRoute(
+          //       builder: (context) => RouteCreationScreen(
+          //             currentLocationData:
+          //                 samplelLocationData, // Replace with actual data
+          //             locationName:
+          //                 "sample location data", // Replace with actual data
+          //             selectedTags: [
+          //               'tag1',
+          //               'tag2'
+          //             ], // Replace with actual data
+          //             allTags: ['tag1', 'tag2', 'tag3'],
+          //           )),
+          // );
+        },
+      ),
     );
   }
 }
