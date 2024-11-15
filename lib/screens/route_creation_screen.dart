@@ -174,7 +174,7 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
     print('STOPS -$stops');
     String? generatedRRule = generatedRRuleNotifier.value;
     String tag = '';
-    List<dynamic> tagsList = _textfieldTagsController.getTags! as List<dynamic>;
+    List<dynamic> tagsList = _textfieldTagsController.getTags!;
     if (tagsList.isNotEmpty) {
       for (int i = 0; i < tagsList.length; i++) {
         if (i == tagsList.length - 1) {

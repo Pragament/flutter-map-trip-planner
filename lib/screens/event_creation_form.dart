@@ -1,22 +1,23 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map_trip_planner/models/event.dart';
-import 'package:flutter_map_trip_planner/providers/event_provider.dart';
+
 import 'package:flutter_map_trip_planner/providers/loading_provider.dart';
-import 'package:flutter_map_trip_planner/providers/location_provider.dart';
+
 import 'package:flutter_map_trip_planner/providers/route_provider.dart';
 import 'package:flutter_map_trip_planner/screens/route_add_stop.dart';
 
 import 'package:flutter_map_trip_planner/utilities/location_functions.dart';
 import 'package:flutter_map_trip_planner/utilities/rrule_date_calculator.dart';
-import 'package:flutter_map_trip_planner/widgets/tags_selection_dialog.dart';
+
 import 'package:flutter_osm_plugin/flutter_osm_plugin.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:location/location.dart';
 import 'package:flutter_map/flutter_map.dart' as flutterMap;
 import 'package:flutter_osm_interface/flutter_osm_interface.dart' as osm;
 import 'package:provider/provider.dart';
-import 'package:rrule/rrule.dart';
+
 import 'package:rrule_generator/rrule_generator.dart';
 
 import 'package:textfield_tags/textfield_tags.dart';
@@ -49,7 +50,7 @@ class _EventFormState extends State<EventForm> {
   late TextEditingController _titleController;
   late TextEditingController _descriptionController;
   late TextEditingController _pincodeController;
-  late TextEditingController _idController;
+
   late TextEditingController _phoneNumberController;
   late TextEditingController _imgUrlController;
   late TextEditingController _readMoreUrlController;
@@ -88,7 +89,7 @@ class _EventFormState extends State<EventForm> {
     _titleController = TextEditingController();
     _descriptionController = TextEditingController();
     _pincodeController = TextEditingController();
-    _idController = TextEditingController();
+
     _phoneNumberController = TextEditingController();
     _imgUrlController = TextEditingController();
     _readMoreUrlController = TextEditingController();
@@ -118,7 +119,7 @@ class _EventFormState extends State<EventForm> {
       _titleController.text = event.title;
       _descriptionController.text = event.description;
       _pincodeController.text = event.pincode ?? '';
-      _idController.text = event.id;
+
       _phoneNumberController.text = event.phoneNumber;
       _imgUrlController.text = event.imgUrl;
       _readMoreUrlController.text = event.readMoreUrl;
@@ -309,7 +310,8 @@ class _EventFormState extends State<EventForm> {
   }
 
 // save event
-  void _saveEvent() {
+
+  void _saveEvent() async {
     // Get values from text controllers
     String title = _titleController.text;
     String description = _descriptionController.text;
@@ -351,15 +353,24 @@ class _EventFormState extends State<EventForm> {
         dates = dateCalculator.calculateRecurringDates();
       }
 
+      // Get the current user
+      User? user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        _showErrorDialog(
+            'User Not Logged In', 'Please log in to create an event.');
+        return;
+      }
+
       // Prepare event data
       final event = Event(
         // Use existing ID if editing, create new one if creating
         id: widget.event?.id ?? UniqueKey().toString(),
+        userId: user.uid, // Associate event with current user's ID
         title: title,
         description: description,
         isOnline: _isOnlineEvent,
         pincode: pincode,
-        multipleStops: stops.length > 1,
+        hasMultipleStops: stops.length > 1,
         phoneNumber: phoneNumber,
         imgUrl: imgUrl,
         readMoreUrl: readMoreUrl,
@@ -371,24 +382,36 @@ class _EventFormState extends State<EventForm> {
         tags: List<String>.from(
             tags), // Create a new list to avoid reference issues
         isApproved: _isApprovedEvent,
-        stops: stops
-            .map((stop) => '${stop.latitude},${stop.longitude}')
-            .toList(), // Create a new list of stops
+        stops:
+            stops.map((stop) => '${stop.latitude},${stop.longitude}').toList(),
       );
 
-      final eventProvider = Provider.of<EventProvider>(context, listen: false);
+      // Convert the event to a map for Firestore
+      final eventData = event.toMap();
 
-      // Update or create based on whether we're editing
-      if (widget.event != null ) {
-        eventProvider.updateEvent(event.id, event);
+      // Save to Firestore
+      final eventRef =
+          FirebaseFirestore.instance.collection('events').doc(event.id);
+
+      if (widget.event != null) {
+        // Update existing event
+        await eventRef.update(eventData);
         _showSuccessDialog(
-            'Event Updated', 'The event has been successfully updated.'  );
-    
+            'Event Updated', 'The event has been successfully updated.');
       } else {
-        eventProvider.addEvent(event);
+        // Create new event
+        await eventRef.set(eventData);
+
+        // Step 3: Update user's document with this event ID
+        final userRef =
+            FirebaseFirestore.instance.collection('users').doc(user.uid);
+        await userRef.update({
+          'eventIds': FieldValue.arrayUnion(
+              [event.id]) // Add event ID to user's document
+        });
+
         _showSuccessDialog(
             'Event Created', 'The event has been successfully created.');
-       
       }
     } catch (e) {
       print('Error saving event: $e');
@@ -780,14 +803,6 @@ class _EventFormState extends State<EventForm> {
                   ),
                 const SizedBox(height: 16.0),
                 TextFormField(
-                  controller: _idController,
-                  decoration: const InputDecoration(
-                    labelText: 'Event ID',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 16.0),
-                TextFormField(
                   controller: _phoneNumberController,
                   decoration: const InputDecoration(
                     labelText: 'Phone Number',
@@ -1002,7 +1017,7 @@ class _EventFormState extends State<EventForm> {
     _titleController.dispose();
     _descriptionController.dispose();
     _pincodeController.dispose();
-    _idController.dispose();
+
     _phoneNumberController.dispose();
     _imgUrlController.dispose();
     _readMoreUrlController.dispose();

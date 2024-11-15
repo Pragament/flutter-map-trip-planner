@@ -1,23 +1,34 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_map_trip_planner/providers/event_provider.dart';
-import 'package:flutter_map_trip_planner/providers/location_provider.dart';
-import 'package:flutter_map_trip_planner/providers/user_info_provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_map_trip_planner/models/event.dart';
 import 'package:flutter_map_trip_planner/screens/event_creation_form.dart';
-import 'package:provider/provider.dart';
 
 class EventListView extends StatelessWidget {
   final bool isAdmin;
-  EventListView({super.key, required this.isAdmin});
+  final List<dynamic>
+      userEvents; // Use List<Map<String, dynamic>> to store events
+
+  EventListView({super.key, required this.isAdmin, required this.userEvents});
+
+  // Function to toggle approval status in Firestore
+  Future<void> _toggleApproval(String eventId, bool currentStatus) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('events')
+          .doc(eventId)
+          .update({'isApproved': !currentStatus});
+      print("Event approval status updated successfully");
+    } catch (e) {
+      print("Error updating approval status: $e");
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final eventProvider = Provider.of<EventProvider>(context);
-    final events = eventProvider.events;
-    final cl = Provider.of<LocationProvider>(context).currentLocation;
-
     // Filter events based on user role
-    final filteredEvents =
-        isAdmin ? events : events.where((event) => event.isApproved).toList();
+    final filteredEvents = isAdmin
+        ? userEvents
+        : userEvents.where((event) => event['isApproved'] == true).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -31,24 +42,27 @@ class EventListView extends StatelessWidget {
           return Card(
             margin: EdgeInsets.all(8.0),
             child: ListTile(
-              title: Text(event.title),
+              title: Text(event['title'] ?? 'Untitled Event'),
               subtitle: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (event.pincode != null) Text("Pincode: ${event.pincode}"),
-                  Text("Phone: ${event.phoneNumber}"),
-                  Text("Description: ${event.description}"),
+                  if (event['pincode'] != null)
+                    Text("Pincode: ${event['pincode']}"),
+                  Text("Phone: ${event['phoneNumber']}"),
+                  Text("Description: ${event['description']}"),
                   if (isAdmin)
                     Text(
-                        "Approval Status: ${event.isApproved ? 'Approved' : 'Unapproved'}"),
+                      "Approval Status: ${event['isApproved'] ? 'Approved' : 'Unapproved'}",
+                    ),
                 ],
               ),
               trailing: isAdmin
                   ? IconButton(
-                      icon: Icon(event.isApproved ? Icons.check : Icons.remove),
+                      icon: Icon(
+                          event['isApproved'] ? Icons.check : Icons.remove),
                       onPressed: () {
                         // Toggle approval status
-                        eventProvider.toggleApproval(event.id);
+                        _toggleApproval(event['id'], event['isApproved']);
                       },
                     )
                   : IconButton(
@@ -59,8 +73,8 @@ class EventListView extends StatelessWidget {
                           MaterialPageRoute(
                             builder: (context) => EventForm(
                               isAdmin: isAdmin,
-                              currentLocationData: cl,
-                              event: event,
+                              currentLocationData: event['locationData'],
+                              event: Event.fromMap(event),
                             ),
                           ),
                         );

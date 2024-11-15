@@ -43,9 +43,11 @@ import '../utilities/location_functions.dart';
 import '../utilities/rrule_parser.dart';
 
 class AllRoutesMapScreen extends StatefulWidget {
-  AllRoutesMapScreen({required this.userRoutes, super.key});
+  AllRoutesMapScreen(
+      {required this.userRoutes, required this.userEvents, super.key});
 
   List<dynamic>? userRoutes;
+  List<dynamic>? userEvents;
 
   @override
   State<AllRoutesMapScreen> createState() => _AllRoutesMapScreenState();
@@ -1473,6 +1475,7 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen>
                                         ),
                                       EventListView(
                                         isAdmin: isAdmin,
+                                        userEvents: widget.userEvents ?? [],
                                       ),
                                     ],
                                   ),
