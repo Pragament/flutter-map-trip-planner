@@ -1476,6 +1476,7 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen>
                                       EventListView(
                                         isAdmin: isAdmin,
                                         userEvents: widget.userEvents ?? [],
+                                        isLoggedIn: !hasSkippedLogin,
                                       ),
                                     ],
                                   ),

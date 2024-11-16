@@ -149,6 +149,7 @@ class _RouteCreationScreenState extends State<RouteCreationScreen> {
       String userID = user.uid;
 
       // Step 1: Add the full route details to the 'routes' collection
+      
       DocumentReference routeRef =
           await FirebaseFirestore.instance.collection('routes').add(newRoute);
 

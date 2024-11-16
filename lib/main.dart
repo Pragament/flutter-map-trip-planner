@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_map_trip_planner/models/event.dart';
 import 'package:flutter_map_trip_planner/providers/event_provider.dart';
 import 'package:flutter_map_trip_planner/providers/filters_provider.dart';
 import 'package:flutter_map_trip_planner/providers/loading_provider.dart';
@@ -172,38 +173,59 @@ Future<List<Map<String, dynamic>>> _fetchEvents() async {
   User? user = FirebaseAuth.instance.currentUser;
 
   if (user != null) {
-    // Step 1: Fetch the user's document
-    DocumentSnapshot<Map<String, dynamic>> userDoc = await FirebaseFirestore
-        .instance
-        .collection('users')
-        .doc(user.uid)
-        .get();
-
-    // Step 2: Get the list of event IDs
-    List<dynamic> eventIds = userDoc.get('eventIds') ?? [];
-
-    // Step 3: Initialize an empty list to hold the events
-    List<Map<String, dynamic>> events = [];
-
-    // Step 4: Fetch each event from the 'events' collection using the event IDs
-    for (var eventId in eventIds) {
-      DocumentSnapshot<Map<String, dynamic>> eventDoc = await FirebaseFirestore
+    try {
+      // Fetch user document
+      DocumentSnapshot<Map<String, dynamic>> userDoc = await FirebaseFirestore
           .instance
-          .collection('events')
-          .doc(eventId)
+          .collection('users')
+          .doc(user.uid)
           .get();
 
-      if (eventDoc.exists) {
-        events.add(eventDoc.data()!); // Add the event data to the list
-      }
+      // Get list of event IDs
+      List<dynamic> eventIds = userDoc.get('eventIds') ?? [];
+
+      // Fetch events in parallel using Futures
+      List<DocumentSnapshot<Map<String, dynamic>>> eventDocs =
+          await Future.wait(
+        eventIds.map((eventId) {
+          return FirebaseFirestore.instance
+              .collection('events')
+              .doc(eventId)
+              .get();
+        }),
+      );
+
+      // Filter out non-existing documents and convert to map
+      List<Map<String, dynamic>> events = eventDocs
+          .where((doc) => doc.exists)
+          .map((doc) => doc.data()!)
+          .toList();
+
+      return events;
+    } catch (e) {
+      // Handle errors and return an empty list if something goes wrong
+      print('Error fetching user events: $e');
+      return [];
     }
+  } else {
+    try {
+      // Fetch all events for non-logged-in users
+      QuerySnapshot<Map<String, dynamic>> allEventsSnapshot =
+          await FirebaseFirestore.instance.collection('events').get();
 
-    // Step 5: Return the list of events
-    return events;
+      // Convert query snapshot to a list of maps
+      List<Map<String, dynamic>> allEvents =
+          allEventsSnapshot.docs.map((doc) => doc.data()).toList();
+
+      return allEvents;
+    } catch (e) {
+      // Handle errors and return an empty list
+      print('Error fetching all events: $e');
+      return [];
+    }
   }
-
-  return [];
 }
+
 
 class MyApp extends StatefulWidget {
   final bool isSignedInWithin5Days;
@@ -284,10 +306,6 @@ class _MyAppState extends State<MyApp> {
                     .userRoutes,
                 userEvents:
                     Provider.of<EventProvider>(context, listen: false).events,
-              ),
-          '/allevents': (context) => EventListView(
-                userEvents: widget.userEvents ?? [],
-                isAdmin: false,
               ),
         },
       ),

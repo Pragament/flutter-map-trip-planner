@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map_trip_planner/models/event.dart';
+import 'package:flutter_map_trip_planner/providers/event_provider.dart';
 
 import 'package:flutter_map_trip_planner/providers/loading_provider.dart';
 
@@ -396,6 +397,8 @@ class _EventFormState extends State<EventForm> {
       if (widget.event != null) {
         // Update existing event
         await eventRef.update(eventData);
+        Provider.of<EventProvider>(context, listen: false)
+            .updateEvent(event.id, event);
         _showSuccessDialog(
             'Event Updated', 'The event has been successfully updated.');
       } else {
@@ -409,6 +412,7 @@ class _EventFormState extends State<EventForm> {
           'eventIds': FieldValue.arrayUnion(
               [event.id]) // Add event ID to user's document
         });
+        Provider.of<EventProvider>(context, listen: false).addEvent(event);
 
         _showSuccessDialog(
             'Event Created', 'The event has been successfully created.');
@@ -451,8 +455,6 @@ class _EventFormState extends State<EventForm> {
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                Navigator.of(context)
-                    .pushNamedAndRemoveUntil('/allevents', (route) => false);
               },
               child: const Text('Ok'),
             ),
@@ -1000,6 +1002,7 @@ class _EventFormState extends State<EventForm> {
                   onPressed: () {
                     if (_formKey.currentState!.validate()) {
                       _saveEvent();
+                      Navigator.pop(context);
                     }
                   },
                   child: const Text('Submit'),
