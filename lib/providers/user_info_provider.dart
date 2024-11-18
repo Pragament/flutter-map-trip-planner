@@ -6,7 +6,7 @@ class UserInfoProvider extends ChangeNotifier {
   String userName = '';
   String dateOfBirth = '';
   String phoneNumber = '';
-  bool isUserAdmin = false;
+  bool? isUserAdmin;
 
   void assignUserInfo(
       {required String userName,
