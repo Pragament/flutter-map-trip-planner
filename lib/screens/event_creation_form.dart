@@ -103,9 +103,14 @@ class _EventFormState extends State<EventForm> {
     _endTimeController = TextEditingController();
     _tagsController = TextEditingController();
     _textfieldTagsController = TextfieldTagsController();
+    isUserAdmin();
+  }
 
-    _isUserAdmin =
-        Provider.of<UserInfoProvider>(context, listen: false).isUserAdmin;
+  void isUserAdmin() {
+    setState(() {
+      _isUserAdmin =
+          Provider.of<UserInfoProvider>(context, listen: false).isUserAdmin;
+    });
   }
 
   @override
