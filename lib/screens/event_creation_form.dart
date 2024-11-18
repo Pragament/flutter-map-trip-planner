@@ -77,12 +77,29 @@ class _EventFormState extends State<EventForm> {
 
   bool _isOnlineEvent = false;
   bool _isApprovedEvent = false;
+  bool _isUserAdmin = true;
 
   final List<FocusNode> _stopFocusNodes = [FocusNode()];
   late flutterMap.Marker marker;
 
   String savedRRule =
       'RRULE:FREQ=MONTHLY;BYMONTHDAY=22;INTERVAL=1;UNTIL=20240823';
+
+  // Future<void> isUserAdmin() async {
+  //   User? user = FirebaseAuth.instance.currentUser;
+
+  //   if (user != null) {
+  //     // Fetch user's event IDs
+  //     final userAdmin = await FirebaseFirestore.instance
+  //         .collection('users')
+  //         .doc(user.isUserAdmin)
+  //         .get();
+
+  //     setState(() {
+  //       _isUserAdmin = userAdmin;
+  //     });
+  //   }
+  // }
 
   @override
   void initState() {
@@ -987,7 +1004,7 @@ class _EventFormState extends State<EventForm> {
                   ),
                 ),
                 const SizedBox(height: 16.0),
-                if (widget.isAdmin)
+                if (widget.isAdmin || _isUserAdmin)
                   SwitchListTile(
                     title: const Text('Approved Event'),
                     value: _isApprovedEvent,
