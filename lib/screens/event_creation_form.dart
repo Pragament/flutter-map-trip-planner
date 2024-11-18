@@ -7,6 +7,7 @@ import 'package:flutter_map_trip_planner/providers/event_provider.dart';
 import 'package:flutter_map_trip_planner/providers/loading_provider.dart';
 
 import 'package:flutter_map_trip_planner/providers/route_provider.dart';
+import 'package:flutter_map_trip_planner/providers/user_info_provider.dart';
 import 'package:flutter_map_trip_planner/screens/route_add_stop.dart';
 
 import 'package:flutter_map_trip_planner/utilities/location_functions.dart';
@@ -77,29 +78,13 @@ class _EventFormState extends State<EventForm> {
 
   bool _isOnlineEvent = false;
   bool _isApprovedEvent = false;
-  bool _isUserAdmin = true;
+  bool _isUserAdmin = false;
 
   final List<FocusNode> _stopFocusNodes = [FocusNode()];
   late flutterMap.Marker marker;
 
   String savedRRule =
       'RRULE:FREQ=MONTHLY;BYMONTHDAY=22;INTERVAL=1;UNTIL=20240823';
-
-  // Future<void> isUserAdmin() async {
-  //   User? user = FirebaseAuth.instance.currentUser;
-
-  //   if (user != null) {
-  //     // Fetch user's event IDs
-  //     final userAdmin = await FirebaseFirestore.instance
-  //         .collection('users')
-  //         .doc(user.isUserAdmin)
-  //         .get();
-
-  //     setState(() {
-  //       _isUserAdmin = userAdmin;
-  //     });
-  //   }
-  // }
 
   @override
   void initState() {
@@ -118,6 +103,9 @@ class _EventFormState extends State<EventForm> {
     _endTimeController = TextEditingController();
     _tagsController = TextEditingController();
     _textfieldTagsController = TextfieldTagsController();
+
+    _isUserAdmin =
+        Provider.of<UserInfoProvider>(context, listen: false).isUserAdmin;
   }
 
   @override

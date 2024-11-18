@@ -45,7 +45,6 @@ void main() async {
 
   List<Map<String, dynamic>> routes =
       await _fetchRoutes(); // Assuming _fetchRoutes is defined in route_table.dart
-  List<Map<String, dynamic>> userEvents = await _fetchEvents();
 
   // Function to send notification if nearest date is today
   void sendNotificationIfNearestDateIsToday() {
@@ -99,7 +98,7 @@ void main() async {
   // }
 
   runApp(
-    MyApp(isSignedInWithin5Days, routes, userEvents),
+    MyApp(isSignedInWithin5Days, routes),
   );
 }
 
@@ -169,49 +168,11 @@ Future<List<Map<String, dynamic>>> _fetchRoutes() async {
   return [];
 }
 
-Future<List<Map<String, dynamic>>> _fetchEvents() async {
-  User? user = FirebaseAuth.instance.currentUser;
-
-  if (user != null) {
-    DocumentSnapshot<Map<String, dynamic>> userDoc = await FirebaseFirestore
-        .instance
-        .collection('users')
-        .doc(user.uid)
-        .get();
-
-    // Step 2: Get the list of event IDs
-    List<dynamic> eventIds = userDoc.get('eventIds') ?? [];
-
-    // Step 3: Initialize an empty list to hold the events
-    List<Map<String, dynamic>> events = [];
-
-    // Step 4: Fetch each event from the 'events' collection using the event IDs
-    for (var eventId in eventIds) {
-      DocumentSnapshot<Map<String, dynamic>> eventDoc = await FirebaseFirestore
-          .instance
-          .collection('events')
-          .doc(eventId)
-          .get();
-
-      if (eventDoc.exists) {
-        events.add(eventDoc.data()!); // Add the event data to the list
-      }
-    }
-
-    // Step 5: Return the list of events
-    return events;
-  }
-
-  return [];
-}
-
 class MyApp extends StatefulWidget {
   final bool isSignedInWithin5Days;
   final List<Map<String, dynamic>>? routes;
-  final List<Map<String, dynamic>>? userEvents;
 
-  const MyApp(this.isSignedInWithin5Days, this.routes, this.userEvents,
-      {super.key});
+  const MyApp(this.isSignedInWithin5Days, this.routes, {super.key});
 
   @override
   State<MyApp> createState() => _MyAppState();
@@ -272,8 +233,7 @@ class _MyAppState extends State<MyApp> {
           useMaterial3: true,
         ),
         home: widget.isSignedInWithin5Days
-            ? AllRoutesMapScreen(
-                userRoutes: widget.routes, userEvents: widget.userEvents)
+            ? AllRoutesMapScreen(userRoutes: widget.routes)
             : PhoneAuthScreen(),
         debugShowCheckedModeBanner: false,
         routes: {
@@ -282,8 +242,6 @@ class _MyAppState extends State<MyApp> {
           '/allroutes': (context) => AllRoutesMapScreen(
                 userRoutes: Provider.of<RouteProvider>(context, listen: false)
                     .userRoutes,
-                userEvents:
-                    Provider.of<EventProvider>(context, listen: false).events,
               ),
         },
       ),

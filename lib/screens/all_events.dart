@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_map_trip_planner/providers/user_info_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_map_trip_planner/models/event.dart';
 import 'package:flutter_map_trip_planner/screens/event_creation_form.dart';
@@ -156,6 +157,8 @@ class _EventListViewState extends State<EventListView> {
             .collection('users')
             .doc(user.uid)
             .get();
+
+       
 
         List<String> eventIds =
             List<String>.from(userDoc.get('eventIds') ?? []);

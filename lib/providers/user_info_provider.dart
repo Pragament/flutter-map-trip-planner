@@ -6,28 +6,17 @@ class UserInfoProvider extends ChangeNotifier {
   String userName = '';
   String dateOfBirth = '';
   String phoneNumber = '';
-  User? _user;
-
-  User? get user => _user;
+  bool isUserAdmin = false;
 
   void assignUserInfo(
       {required String userName,
       required String dateOfBirth,
-      required String phoneNumber}) {
+      required String phoneNumber,
+      required bool isUserAdmin}) {
     this.userName = userName;
     this.dateOfBirth = dateOfBirth;
     this.phoneNumber = phoneNumber;
-    notifyListeners();
-  }
-
-  void setUser(User user) {
-    _user = user;
-    notifyListeners();
-  }
-
-  // Logout user
-  void logout() {
-    _user = null;
+    this.isUserAdmin = isUserAdmin;
     notifyListeners();
   }
 }
