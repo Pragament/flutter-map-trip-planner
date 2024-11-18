@@ -1490,7 +1490,7 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen>
                 }
               },
             ),
-            floatingActionButton: !hasSkippedLogin
+            floatingActionButton: hasSkippedLogin
                 ? null // Hide the button if user has skipped login
                 : FloatingActionButtonCustom(
                     selectedTags: selectedTags,
