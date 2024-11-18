@@ -1475,8 +1475,7 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen>
                                         ),
                                       EventListView(
                                         isAdmin: isAdmin,
-                                        userEvents: widget.userEvents ?? [],
-                                        isLoggedIn: !hasSkippedLogin,
+                                        hasSkippedLogin: hasSkippedLogin,
                                       ),
                                     ],
                                   ),
@@ -1491,7 +1490,7 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen>
                 }
               },
             ),
-            floatingActionButton: hasSkippedLogin
+            floatingActionButton: !hasSkippedLogin
                 ? null // Hide the button if user has skipped login
                 : FloatingActionButtonCustom(
                     selectedTags: selectedTags,
