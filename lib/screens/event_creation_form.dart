@@ -109,10 +109,11 @@ class _EventFormState extends State<EventForm> {
   void isUserAdmin() {
     final userAdmin =
         Provider.of<UserInfoProvider>(context, listen: false).isUserAdmin;
-    if (userAdmin != null)
+    if (userAdmin != null) {
       setState(() {
         _isUserAdmin = userAdmin;
       });
+    }
   }
 
   @override
