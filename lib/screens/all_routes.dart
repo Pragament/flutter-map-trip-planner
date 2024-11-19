@@ -208,6 +208,7 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen>
           phoneNumber: userDoc.get(
             'phoneNumber',
           ),
+          isUserAdmin: userDoc.get('isUserAdmin')
         );
       }
       List<dynamic> userAddedStopsData = [];
@@ -1473,6 +1474,7 @@ class _AllRoutesMapScreenState extends State<AllRoutesMapScreen>
                                         ),
                                       EventListView(
                                         isAdmin: isAdmin,
+                                        hasSkippedLogin: hasSkippedLogin,
                                       ),
                                     ],
                                   ),

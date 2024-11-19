@@ -6,12 +6,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_map_trip_planner/models/event.dart';
 import 'package:flutter_map_trip_planner/providers/event_provider.dart';
 import 'package:flutter_map_trip_planner/providers/filters_provider.dart';
 import 'package:flutter_map_trip_planner/providers/loading_provider.dart';
 import 'package:flutter_map_trip_planner/providers/location_provider.dart';
 import 'package:flutter_map_trip_planner/providers/route_provider.dart';
 import 'package:flutter_map_trip_planner/providers/user_info_provider.dart';
+import 'package:flutter_map_trip_planner/screens/all_events.dart';
 // import 'package:flutter_map_trip_planner/route_details_fetcher.dart';
 import 'package:flutter_map_trip_planner/screens/all_routes.dart';
 import 'package:flutter_map_trip_planner/screens/login.dart';
@@ -231,9 +233,7 @@ class _MyAppState extends State<MyApp> {
           useMaterial3: true,
         ),
         home: widget.isSignedInWithin5Days
-            ? AllRoutesMapScreen(
-                userRoutes: widget.routes,
-              )
+            ? AllRoutesMapScreen(userRoutes: widget.routes)
             : PhoneAuthScreen(),
         debugShowCheckedModeBanner: false,
         routes: {
