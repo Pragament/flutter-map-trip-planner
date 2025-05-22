@@ -151,7 +151,9 @@ See [Contributing Guidelines](#contributing-guidelines) above for detailed instr
 
 ## License
 
-[MIT](LICENSE)
+This project is licensed under the [GNU Affero General Public License v3.0](LICENSE).
+
+---
 
 ### Phone Numbers for Testing:
 
